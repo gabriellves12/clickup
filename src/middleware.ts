@@ -1,15 +1,35 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Middleware roda em cada request. Aqui refresh de sessão Supabase (renova access
-// token quando expira) + propaga cookies atualizados para a resposta.
+// Middleware — só faz refresh de sessão Supabase quando há cookie de sessão presente
+// e a rota está dentro do app autenticado. Rotas públicas (login, definir senha,
+// static) passam direto — evita hop desnecessário pro Supabase.
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
 
-  // Se envs não estão configuradas ainda (dev inicial), passa direto sem quebrar.
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
-    return supabaseResponse;
+  // Rotas públicas — nunca precisam de refresh de sessão.
+  if (
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/definir-senha") ||
+    pathname.startsWith("/api/auth") ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
   }
+
+  // Sem cookies do Supabase ainda? Nenhuma sessão para refrescar.
+  // Cookies do Supabase seguem o padrão sb-<ref>-auth-token.
+  const hasSupabaseCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+  if (!hasSupabaseCookie) {
+    return NextResponse.next();
+  }
+
+  // Se envs não estão configuradas (dev inicial), passa direto.
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    return NextResponse.next();
+  }
+
+  let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -32,7 +52,7 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Refresh do token acontece automaticamente aqui.
+  // Refresh do token acontece automaticamente aqui — só quando há sessão.
   await supabase.auth.getUser();
 
   return supabaseResponse;
@@ -40,7 +60,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Roda em tudo exceto assets estáticos e API interna do Next.
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ttf|woff2?)$).*)",
   ],
 };
