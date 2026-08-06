@@ -23,13 +23,11 @@ async function main() {
   });
 
   // ------------------------- Pessoas
-  const gabriel = await prisma.person.create({ data: { name: "Gabriel Alves", email: "gabriel@thinkcontrol.com.br", initials: "GA", color: "av-1", role: "admin" } });
-  await prisma.person.create({ data: { name: "Head de Design", email: "head@thinkcontrol.com.br",    initials: "HD", color: "av-2", role: "manager" } });
-  const rubens  = await prisma.person.create({ data: { name: "Rubens",         email: "rubens@thinkcontrol.com.br",  initials: "RU", color: "av-2", role: "member" } });
-  const pedro   = await prisma.person.create({ data: { name: "Pedro",          email: "pedro@thinkcontrol.com.br",   initials: "PE", color: "av-3", role: "member" } });
-  await prisma.person.create({ data: { name: "Natália",        email: "natalia@thinkcontrol.com.br", initials: "NA", color: "av-4", role: "member" } });
-  const jonathan = await prisma.person.create({ data: { name: "Jonathan",      email: "jonathan@thinkcontrol.com.br", initials: "JO", color: "av-5", role: "member" } });
-  const joao    = await prisma.person.create({ data: { name: "João",           email: "joao@thinkcontrol.com.br",    initials: "JO", color: "av-1", role: "member" } });
+  const gabriel = await prisma.person.create({ data: { name: "Gabriel Alves", email: "gabriellves12@gmail.com", initials: "GA", color: "av-1", role: "admin" } });
+  const jonathan = await prisma.person.create({ data: { name: "Jonathan Wallyce", email: "contatojonathanwallyce@gmail.com", initials: "JW", color: "av-2", role: "manager" } });
+  const rubens  = await prisma.person.create({ data: { name: "Rubens Soares", email: "ei.designermkt@gmail.com", initials: "RS", color: "av-2", role: "member" } });
+  const pedro   = await prisma.person.create({ data: { name: "Pedro Henriquie", email: "ph24402@gmail.com", initials: "PH", color: "av-3", role: "member" } });
+  const joao    = await prisma.person.create({ data: { name: "João Victor", email: "joaovicrengel@gmail.com", initials: "JV", color: "av-1", role: "member" } });
 
   // Composição operacional específica de cada quadro
   for (const [i, p] of [rubens, jonathan, pedro, gabriel].entries()) {
@@ -42,7 +40,7 @@ async function main() {
   const monthsAgo = (n: number) => new Date(now.getFullYear(), now.getMonth() - n, 12);
 
   const fe = await prisma.client.create({ data: {
-    name: "Androclinic & Menopausa", initials: "AM", portalUserLimit: 3,
+    name: "Androclinic & Menopausa", initials: "AM", portalUserLimit: 5,
     tipoContrato: "FIXO", status: "ATIVO",
     startDate: monthsAgo(14),
     contractUrl: "https://drive.google.com/file/d/contrato-fe-alves",
@@ -50,7 +48,7 @@ async function main() {
     whatsappUrl: "https://chat.whatsapp.com/grupo-fe-alves",
   } });
   const studio = await prisma.client.create({ data: {
-    name: "Jéssica Abreu", initials: "JA", portalUserLimit: 3,
+    name: "Jéssica Abreu", initials: "JA", portalUserLimit: 5,
     tipoContrato: "FIXO", status: "ATIVO",
     startDate: monthsAgo(8),
     contractUrl: "https://drive.google.com/file/d/contrato-studio-nova",
@@ -58,13 +56,13 @@ async function main() {
     whatsappUrl: "https://chat.whatsapp.com/grupo-studio-nova",
   } });
   const casaVerde = await prisma.client.create({ data: {
-    name: "Galla Consultoria", initials: "GC", portalUserLimit: 3,
+    name: "Galla Consultoria", initials: "GC", portalUserLimit: 5,
     tipoContrato: "FREELA", status: "ATIVO",
     startDate: monthsAgo(3),
     whatsappUrl: "https://chat.whatsapp.com/grupo-casa-verde",
   } });
   const belaVida = await prisma.client.create({ data: {
-    name: "Elias Maman", initials: "EM", portalUserLimit: 3,
+    name: "Elias Maman", initials: "EM", portalUserLimit: 5,
     tipoContrato: "FREELA", status: "ENCERRADO",
     startDate: monthsAgo(20), endDate: monthsAgo(4),
     contractUrl: "https://drive.google.com/file/d/contrato-bela-vida",

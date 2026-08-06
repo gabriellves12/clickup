@@ -3,17 +3,15 @@
 // Roda depois de `npm run db:seed`. Requer:
 //   NEXT_PUBLIC_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
+//   ADMIN_INITIAL_PASSWORD
 //
-// Uso:
-//   npm run auth:seed                     # senha padrão para todos
-//   npm run auth:seed -- --password=abc   # define senha custom
-//
-// A senha padrão é `Thinkcontrol@2026` — troque em produção e peça reset.
+// Estratégia: todos são criados com email_confirm=true + senha inicial
+// (mesma senha para todos). Não envia email — evita rate limit do Supabase Free
+// e permite testar em ambiente dev com emails que ainda não são reais.
+// Depois de logar, cada um deve trocar a senha em Configurações.
 
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
-
-const DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD ?? "Thinkcontrol@2026";
 
 async function main() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -28,12 +26,14 @@ async function main() {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // Sobrescreve senha padrão via --password=xxx
-  const cliPassword = process.argv.find((arg) => arg.startsWith("--password="))?.split("=")[1];
-  const password = cliPassword ?? DEFAULT_PASSWORD;
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
+  if (!initialPassword) {
+    console.error("✗ Configure ADMIN_INITIAL_PASSWORD em .env.local.");
+    process.exit(1);
+  }
 
   const people = await prisma.person.findMany({ orderBy: { name: "asc" } });
-  console.log(`\nProvisionando ${people.length} usuário(s) com senha "${password}":\n`);
+  console.log(`\nProvisionando ${people.length} usuário(s):\n`);
 
   let created = 0;
   let updated = 0;
@@ -47,17 +47,19 @@ async function main() {
     const email = person.email.toLowerCase();
     const found = byEmail.get(email);
 
+    const mustChange = person.role !== "admin";
     if (found) {
       const { error } = await supabase.auth.admin.updateUserById(found.id, {
-        password,
-        user_metadata: { name: person.name, role: person.role },
+        password: initialPassword,
+        email_confirm: true,
+        user_metadata: { name: person.name, role: person.role, must_change_password: mustChange },
       });
       if (error) { console.error(`✗ ${email}: ${error.message}`); failed++; }
       else { console.log(`↻ ${email} (${person.role})`); updated++; }
     } else {
       const { error } = await supabase.auth.admin.createUser({
-        email, password, email_confirm: true,
-        user_metadata: { name: person.name, role: person.role },
+        email, password: initialPassword, email_confirm: true,
+        user_metadata: { name: person.name, role: person.role, must_change_password: mustChange },
       });
       if (error) { console.error(`✗ ${email}: ${error.message}`); failed++; }
       else { console.log(`+ ${email} (${person.role})`); created++; }
