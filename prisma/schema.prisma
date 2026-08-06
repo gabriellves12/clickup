@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Times & pessoas
+// -----------------------------------------------------------------------------
+model Team {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  name      String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  members TeamMember[]
+  cards   Card[]
+}
+
+model Person {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  initials  String
+  color     String   @default("av-1") // token de gradiente do DS: av-1..av-5
+  role      String   @default("member") // admin | manager | member | client
+  clientId  String?
+  createdAt DateTime @default(now())
+
+  teams TeamMember[]
+  cards Card[]
+  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([clientId])
+}
+
+// Muitos-para-muitos com ordenação da raia por time
+model TeamMember {
+  teamId   String
+  personId String
+  order    Int    @default(0)
+
+  team   Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, personId])
+  @@index([teamId, order])
+}
+
+// -----------------------------------------------------------------------------
+// Clientes & árvore de links
+// -----------------------------------------------------------------------------
+model Client {
+  id             String    @id @default(cuid())
+  name           String
+  initials       String
+  tipoContrato   String    @default("FIXO")   // FIXO | FREELA
+  status         String    @default("ATIVO")  // ATIVO | ENCERRADO
+  startDate      DateTime?
+  endDate        DateTime?
+  contractUrl    String?
+  contractMonths Int?
+  whatsappUrl    String?
+  portalUserLimit Int      @default(1)
+  createdAt      DateTime  @default(now())
+
+  linkTree LinkTree?
+  products Product[]
+  cards    Card[]
+  users    Person[]
+
+  @@index([status])
+  @@index([tipoContrato])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  driveUrl    String?
+  figmaUrl    String?
+  photosUrl   String?
+  observations String?
+  clientId    String
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  cards  Card[]
+
+  @@index([clientId, name])
+}
+
+model DemandType {
+  id            String   @id @default(cuid())
+  name          String
+  prefix        String   @unique
+  variationMode String   @default("FIXED") // FIXED | SLIDES | FREE
+  variations    String   @default("[]") // JSON para compatibilidade com SQLite
+  routeToWeb    Boolean  @default(false)
+  order         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  cards Card[]
+}
+
+model LinkTree {
+  id       String @id @default(cuid())
+  clientId String @unique
+
+  client Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  items  LinkTreeItem[]
+}
+
+model LinkTreeItem {
+  id          String  @id @default(cuid())
+  linkTreeId  String
+  category    String  // drive | figma | photos | instagram | product | cloudflare | hosting | wordpress | custom
+  label       String
+  url         String?
+  observation String? // login, notas
+  parentId    String? // aninhamento (produtos por pasta / figma)
+  order       Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  linkTree LinkTree       @relation(fields: [linkTreeId], references: [id], onDelete: Cascade)
+  parent   LinkTreeItem?  @relation("Nested", fields: [parentId], references: [id], onDelete: SetNull)
+  children LinkTreeItem[] @relation("Nested")
+
+  @@index([linkTreeId, order])
+}
+
+// -----------------------------------------------------------------------------
+// Cards de demanda
+// -----------------------------------------------------------------------------
+model Card {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  briefing         String?
+  variation        String?  // JSON: string[]
+  copyUrl          String?
+  referenceUrl     String?
+  attachmentDriveUrl String?
+  externalMaterials String?
+  useExternalMaterials Boolean @default(false)
+  startDate        DateTime?
+  priority         String @default("NORMAL")
+  status           String    // EM_PRODUCAO | APROVACAO_INTERNA | APROVACAO_CLIENTE | ALTERACAO | FINALIZADO | PROPAGACAO_DNS | IMPLEMENTACAO | OTIMIZACAO
+  clientStatus     String    @default("PENDENTES") // PENDENTES | PARA_PRODUCAO | EM_PRODUCAO | APROVACAO | FINALIZADO
+  tipoProjeto      String    @default("PADRAO") // PADRAO | PAGINA
+  pendenteMaterial Boolean   @default(false)
+  deadline         DateTime?
+  order            Float     @default(1000)
+
+  clientId      String
+  productId     String?
+  demandTypeId  String?
+  responsibleId String
+  teamId        String
+
+  client      Client @relation(fields: [clientId], references: [id])
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  demandType  DemandType? @relation(fields: [demandTypeId], references: [id], onDelete: SetNull)
+  responsible Person @relation(fields: [responsibleId], references: [id])
+  team        Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([teamId, responsibleId, status, order])
+  @@index([teamId, deadline])
+}
+
+// -----------------------------------------------------------------------------
+// Reservado para versões futuras (Comment, Attachment, etc)
+// -----------------------------------------------------------------------------
