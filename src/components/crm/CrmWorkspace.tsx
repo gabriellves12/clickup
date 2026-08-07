@@ -50,10 +50,13 @@ const stages: { id: string; title: string; caption: string; leads: Lead[] }[] = 
 ];
 
 const metrics = [
-  { label: "Pipeline aberto",  value: "R$ 52,4 mil", change: "+12,5%",         detail: "8 oportunidades ativas", icon: CircleDollarSign, tone: "dark"   as const },
-  { label: "Oportunidades",    value: "24",          change: "+4 esta semana", detail: "Ticket médio R$ 5,8 mil", icon: Target,          tone: "light"  as const },
-  { label: "Novas vendas",     value: "R$ 18,7 mil", change: "+28,1%",         detail: "3 contratos neste mês",   icon: Sparkles,        tone: "light"  as const },
-  { label: "Conversão",        value: "31,2%",       change: "+3,8 p.p.",      detail: "Meta mensal: 30%",        icon: UsersRound,      tone: "light"  as const },
+  { label: "Clientes fixos", value: "14", change: "Base ativa", detail: "Parcerias recorrentes", icon: UsersRound, tone: "dark" as const },
+  { label: "Projetos freelancers ativos", value: "7", change: "Em andamento", detail: "Demandas fora da base fixa", icon: Target, tone: "light" as const },
+  { label: "Próximas ações follow-up", value: "0", change: "Sem pendências", detail: "Cadências para retomar", icon: CalendarDays, tone: "light" as const },
+  { label: "Propostas em fechamento", value: "0", change: "Em decisão", detail: "Propostas enviadas", icon: Sparkles, tone: "light" as const },
+  { label: "Valores a fechar", value: "R$ 0", change: "Neste ciclo", detail: "Receita em negociação", icon: CircleDollarSign, tone: "light" as const },
+  { label: "Projetos pausados", value: "0", change: "Sem bloqueios", detail: "Aguardando retomada", icon: MoreHorizontal, tone: "light" as const },
+  { label: "Parcerias encerradas", value: "10", change: "Histórico", detail: "Ciclos concluídos", icon: Check, tone: "light" as const },
 ];
 
 const monthData = [38, 48, 32, 61, 52, 77, 64, 91, 79, 88, 104, 86];
@@ -228,6 +231,26 @@ function OpportunityDashboard() {
         {metrics.map((metric) => <MetricCard key={metric.label} {...metric} />)}
       </div>
 
+      <section className="grid gap-4 xl:grid-cols-2">
+        <DonutPanel
+          title="Visão geral"
+          subtitle="Distribuição de projetos e parcerias"
+          total="49"
+          segments={[{ label: "Clientes fixos", value: 14, shade: "#1a1a1a" }, { label: "Freelancers", value: 7, shade: "#515151" }, { label: "Encerrados", value: 10, shade: "#838383" }, { label: "Projetos concluídos", value: 18, shade: "#b1b1b1" }]}
+        />
+        <DonutPanel
+          title="Fixos / freelancers em atividade"
+          subtitle="Composição da operação atual"
+          total="21"
+          segments={[{ label: "Fixos", value: 11, shade: "#1a1a1a" }, { label: "Freelancers", value: 10, shade: "#999999" }]}
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <RankingPanel title="Principais indicadores" subtitle="Projetos em atividade por cliente" values={[{ label: "Evelin Braga", value: 5 }, { label: "João Benigal", value: 2 }, { label: "Filipe Jorge", value: 2 }, { label: "André M. (PA)", value: 1 }, { label: "Zanelli", value: 1 }, { label: "Gabriel Sales", value: 1 }]} />
+        <RankingPanel title="Valores indicadores" subtitle="Receita estimada por parceria" money values={[{ label: "Filipe Jorge", value: 9200 }, { label: "Evelin Braga", value: 6400 }, { label: "João Menna", value: 5800 }, { label: "João Benigal", value: 5200 }, { label: "Gabriel Sales", value: 4700 }, { label: "Zanelli", value: 4300 }]} />
+      </section>
+
       <div className="grid gap-4 xl:grid-cols-[1.55fr_.9fr]">
         <section className="rounded-lg border border-[#e6e6e6] bg-white">
           <div className="flex items-start justify-between border-b border-[#ececec] p-4">
@@ -353,6 +376,21 @@ function MetricCard({ label, value, change, detail, icon: Icon, tone }: (typeof 
       </div>
     </section>
   );
+}
+
+function DonutPanel({ title, subtitle, total, segments }: { title: string; subtitle: string; total: string; segments: { label: string; value: number; shade: string }[] }) {
+  const sum = segments.reduce((value, segment) => value + segment.value, 0);
+  const gradient = segments.reduce<{ cursor: number; parts: string[] }>((state, segment) => {
+    const next = state.cursor + (segment.value / sum) * 100;
+    return { cursor: next, parts: [...state.parts, `${segment.shade} ${state.cursor}% ${next}%`] };
+  }, { cursor: 0, parts: [] }).parts.join(", ");
+  return <section className="rounded-lg border border-[#e6e6e6] bg-white"><div className="border-b border-[#ececec] px-4 py-3.5"><h2 className="text-[12px] font-semibold">{title}</h2><p className="mt-1 text-[10px] text-[#888]">{subtitle}</p></div><div className="flex flex-col items-center gap-5 p-5 sm:flex-row sm:justify-center"><div className="relative grid size-[142px] place-items-center rounded-full" style={{ background: `conic-gradient(${gradient})` }}><div className="grid size-[88px] place-items-center rounded-full bg-white text-center"><b className="text-[25px] font-semibold tracking-[-.06em] tabular">{total}</b><span className="-mt-1 text-[8px] uppercase tracking-[.1em] text-[#999]">Total</span></div></div><div className="grid min-w-[180px] gap-2">{segments.map((segment) => <div key={segment.label} className="flex items-center justify-between gap-4 text-[10px]"><span className="inline-flex items-center gap-2 text-[#666]"><i className="size-2 rounded-full" style={{ background: segment.shade }} />{segment.label}</span><b className="tabular text-[#333]">{segment.value}</b></div>)}</div></div></section>;
+}
+
+function RankingPanel({ title, subtitle, values, money = false }: { title: string; subtitle: string; values: { label: string; value: number }[]; money?: boolean }) {
+  const max = Math.max(...values.map((item) => item.value), 1);
+  const format = (value: number) => money ? `R$ ${value.toLocaleString("pt-BR")}` : String(value);
+  return <section className="rounded-lg border border-[#e6e6e6] bg-white"><div className="border-b border-[#ececec] px-4 py-3.5"><h2 className="text-[12px] font-semibold">{title}</h2><p className="mt-1 text-[10px] text-[#888]">{subtitle}</p></div><div className="grid gap-3 p-5">{values.map((item, index) => <div key={item.label} className="grid grid-cols-[105px_1fr_58px] items-center gap-3"><span className="truncate text-[9.5px] text-[#666]">{item.label}</span><div className="h-5 overflow-hidden rounded-sm bg-[#f1f1f1]"><div className="h-full rounded-sm bg-[#1a1a1a]" style={{ width: `${Math.max((item.value / max) * 100, 4)}%`, opacity: 1 - index * 0.1 }} /></div><b className="text-right text-[9.5px] tabular text-[#333]">{format(item.value)}</b></div>)}</div></section>;
 }
 
 function LeadDrawer({ lead, onClose }: { lead: Lead; onClose: () => void }) {

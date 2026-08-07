@@ -201,7 +201,11 @@ export async function moveCard(params: {
     },
   });
 
-  revalidatePath(`/board/${card.team.slug}`);
+  // Intencionalmente SEM revalidatePath: o cliente ja atualiza o estado
+  // otimista com o novo status/responsavel/ordem. Chamar revalidate aqui
+  // dispara um refetch pesado (queries do board) que causa lag perceptivel
+  // e pode sobrescrever a UI otimista com dados stale (race). Criacao/deleção
+  // continuam revalidando pois precisam bootstrap de dados novos.
 }
 
 export async function togglePendenteMaterial(id: string, currentTeamSlug: string) {
