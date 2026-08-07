@@ -1,9 +1,16 @@
-import type { StatusDef } from "@/lib/board-config";
-
 export interface PersonLite {
   id: string; name: string; initials: string; color: string;
 }
 export interface ClientLite { id: string; name: string; initials: string; }
+
+// Coluna dinâmica do board (TeamStatus do DB) — inclui id/order para edição.
+export interface FlowColumnDef {
+  id: string;
+  key: string;
+  label: string;
+  order: number;
+  tone: string | null;
+}
 
 export interface CardLite {
   id: string;
@@ -59,7 +66,7 @@ export interface BoardMember { person: PersonLite; order: number; }
 
 export interface BoardData {
   team: { id: string; slug: string; name: string };
-  flow: StatusDef[];
+  flow: FlowColumnDef[];
   members: BoardMember[];
   cards: CardLite[];
   clients: ClientWithLinks[];

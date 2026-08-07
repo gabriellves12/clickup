@@ -22,7 +22,7 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
   });
   if (!team) notFound();
 
-  const flow = team.statuses.map((s) => ({ key: s.key, label: s.label, tone: s.tone }));
+  const flow = team.statuses.map((s) => ({ id: s.id, key: s.key, label: s.label, order: s.order, tone: s.tone }));
 
   const [clients, allPeople, products, demandTypes] = await Promise.all([
     prisma.client.findMany({
