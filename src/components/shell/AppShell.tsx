@@ -38,7 +38,7 @@ type Props = {
 
 const iconMap = {
   home: House, kanban: KanbanSquare, clients: UsersRound, clientArea: PanelsTopLeft,
-  crm: ContactRound, drive: FolderUp, dashboard: BarChart3, accesses: KeyRound, admin: ShieldCheck,
+  crm: ContactRound, drive: FolderUp, references: PanelsTopLeft, dashboard: BarChart3, accesses: KeyRound, admin: ShieldCheck,
 } satisfies Record<NavigationIcon, React.ComponentType<{ className?: string; strokeWidth?: number }>>;
 
 export function AppShell({ user, boards, canEditBoards, clients, overdueCount, pendingMaterialCount, children }: Props) {

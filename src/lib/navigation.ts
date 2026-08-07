@@ -1,5 +1,5 @@
 export type UserRole = "admin" | "manager" | "member" | "client";
-export type NavigationIcon = "home" | "kanban" | "clients" | "clientArea" | "crm" | "drive" | "dashboard" | "accesses" | "admin";
+export type NavigationIcon = "home" | "kanban" | "clients" | "clientArea" | "crm" | "drive" | "dashboard" | "accesses" | "references" | "admin";
 
 export type NavigationItem = {
   label: string;
@@ -18,6 +18,7 @@ export const navigationItems: NavigationItem[] = [
   { label: "Kanban", description: "Quadros e demandas", href: "/kanban", icon: "kanban", rolesAllowed: internal, group: "operational", matchPrefixes: ["/kanban", "/board"] },
   { label: "Clientes", description: "Histórico e relacionamentos", href: "/clientes", icon: "clients", rolesAllowed: internal, group: "operational" },
   { label: "Drive", description: "Arquivos internos", href: "/drive", icon: "drive", rolesAllowed: internal, group: "operational" },
+  { label: "Referências", description: "Mural de inspiração", href: "/referencias", icon: "references", rolesAllowed: internal, group: "operational" },
   { label: "CRM", description: "Leads e ativações", href: "/crm", icon: "crm", rolesAllowed: ["admin"], group: "admin" },
   { label: "Planilha de acessos", description: "Ferramentas e referências", href: "/acessos", icon: "accesses", rolesAllowed: ["admin", "manager"], group: "admin" },
   { label: "Dashboard de Dados", description: "Indicadores da operação", href: "/dashboard", icon: "dashboard", rolesAllowed: ["admin"], group: "admin" },

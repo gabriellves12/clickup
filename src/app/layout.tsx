@@ -3,7 +3,7 @@ import { GlobalSplash } from "@/components/shell/GlobalSplash";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Control — Operation OS",
+  title: "Thinkcontrol",
   description: "Workspace interno de operação e gestão.",
   icons: { icon: "/control-icon.svg" },
 };
