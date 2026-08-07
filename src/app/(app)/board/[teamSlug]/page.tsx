@@ -6,7 +6,6 @@ import { requireCurrentUser } from "@/lib/current-user";
 
 export default async function BoardPage({ params }: { params: Promise<{ teamSlug: string }> }) {
   const user = await requireCurrentUser();
-  if (user.role === "client") redirect("/portal");
   const { teamSlug } = await params;
 
   const team = await prisma.team.findUnique({
@@ -22,6 +21,12 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
   });
   if (!team) notFound();
   if (team.kind === "CLIENT" && user.role === "member") redirect("/kanban");
+  // Cliente só acessa o próprio board CLIENT.
+  if (user.role === "client") {
+    if (team.kind !== "CLIENT" || team.clientId !== user.clientId) {
+      notFound();
+    }
+  }
 
   const flow = team.statuses.map((s) => ({
     id: s.id, key: s.key, label: s.label, order: s.order, tone: s.tone,
@@ -104,10 +109,11 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
     })),
   };
 
+  const isOwnClientBoard = user.role === "client" && team.clientId === user.clientId;
   return (
     <BoardClient
       data={data}
-      canManage={user.role === "admin" || user.role === "manager"}
+      canManage={user.role === "admin" || user.role === "manager" || isOwnClientBoard}
       currentUserId={user.id}
     />
   );

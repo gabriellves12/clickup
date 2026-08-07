@@ -1,11 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Bell, CalendarDays, Megaphone, ArrowUpRight, CircleAlert } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/current-user";
 
 export default async function WelcomePage() {
   const user = await requireCurrentUser();
+  // Cliente: manda direto pro board da própria pasta.
+  if (user.role === "client") {
+    const clientTeam = user.clientId
+      ? await prisma.team.findFirst({ where: { kind: "CLIENT", clientId: user.clientId }, select: { slug: true } })
+      : null;
+    redirect(clientTeam ? `/board/${clientTeam.slug}` : "/portal");
+  }
   const firstName = user.name.split(" ")[0];
   const person = await prisma.person.findFirst({ where: { name: { contains: firstName } } });
   const now = new Date(); const weekEnd = new Date(now); weekEnd.setDate(now.getDate() + 7);

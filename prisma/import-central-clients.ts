@@ -144,10 +144,10 @@ async function syncClient(db: Prisma.TransactionClient, source: SourceClient) {
   const client = existing
     ? await db.client.update({
         where: { id: existing.id },
-        data: { initials: initials(source.name), tipoContrato: "FIXO", status: "ATIVO", whatsappUrl: source.whatsappUrl },
+        data: { initials: initials(source.name), tipoContrato: "FIXO", status: "ATIVO", whatsappUrl: source.whatsappUrl, centralSource: true },
       })
     : await db.client.create({
-        data: { name: source.name, initials: initials(source.name), tipoContrato: "FIXO", status: "ATIVO", whatsappUrl: source.whatsappUrl },
+        data: { name: source.name, initials: initials(source.name), tipoContrato: "FIXO", status: "ATIVO", whatsappUrl: source.whatsappUrl, centralSource: true },
       });
 
   const tree = await db.linkTree.upsert({
@@ -208,6 +208,9 @@ async function main() {
   }
 
   const summary = await prisma.$transaction(async (db) => {
+    // A aba Clientes deve refletir exclusivamente a central HTML mais recente.
+    // Os demais registros continuam preservados no banco, só deixam de aparecer nessa visão.
+    await db.client.updateMany({ data: { centralSource: false } });
     const result = [];
     for (const client of clients) result.push(await syncClient(db, client));
     return result;

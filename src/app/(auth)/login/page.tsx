@@ -12,7 +12,7 @@ const bannerPath = "/login-banner-v2.webp";
 
 export default async function LoginPage() {
   const user = await getCurrentUser();
-  if (user) redirect(user.role === "client" ? "/portal" : "/inicio");
+  if (user) redirect("/inicio");
 
   const hasBanner = existsSync(path.join(process.cwd(), "public", bannerPath));
 

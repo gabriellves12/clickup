@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, ChevronDown, ChevronLeft, ChevronRight, ContactRound, FolderKanban,
-  FolderUp, House, KanbanSquare, LogOut, PanelsTopLeft, Plus, Settings, ShieldCheck, UsersRound,
+  FolderUp, House, KanbanSquare, LogOut, MessageCircle, PanelsTopLeft, Plus, Settings, ShieldCheck, UsersRound,
   KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -38,7 +38,7 @@ type Props = {
 
 const iconMap = {
   home: House, kanban: KanbanSquare, clients: UsersRound, clientArea: PanelsTopLeft,
-  crm: ContactRound, drive: FolderUp, references: PanelsTopLeft, dashboard: BarChart3, accesses: KeyRound, admin: ShieldCheck,
+  crm: ContactRound, conversations: MessageCircle, drive: FolderUp, references: PanelsTopLeft, dashboard: BarChart3, accesses: KeyRound, admin: ShieldCheck,
 } satisfies Record<NavigationIcon, React.ComponentType<{ className?: string; strokeWidth?: number }>>;
 
 export function AppShell({ user, boards, canEditBoards, clients, overdueCount, pendingMaterialCount, children }: Props) {

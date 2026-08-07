@@ -76,11 +76,30 @@ type CardInput = {
 };
 
 export async function createOrUpdateCard(input: CardInput) {
-  await requireOperationalManager();
+  const user = await requireCurrentUser();
+  const isManager = user.role === "admin" || user.role === "manager";
+  const isClient = user.role === "client";
+  if (!isManager && !isClient) {
+    throw new Error("Você não tem permissão para alterar tarefas.");
+  }
+  // Cliente só pode mexer em cards do próprio cliente.
+  if (isClient && input.clientId !== user.clientId) {
+    throw new Error("Sem permissão para essa demanda.");
+  }
+  if (isClient && input.id) {
+    const existing = await prisma.card.findUnique({ where: { id: input.id }, select: { clientId: true } });
+    if (!existing || existing.clientId !== user.clientId) {
+      throw new Error("Sem permissão para essa demanda.");
+    }
+  }
 
   const destSlug = await resolveDestSlug(input.tipoProjeto, input.currentTeamSlug);
   const destTeam = await prisma.team.findUnique({ where: { slug: destSlug } });
   if (!destTeam) throw new Error("Quadro destino não encontrado.");
+  // Cliente só cria/edita cards em board do próprio cliente.
+  if (isClient && destTeam.clientId !== user.clientId) {
+    throw new Error("Sem permissão para esse quadro.");
+  }
   const teamId = destTeam.id;
 
   const flowKeys = await statusKeysForTeamSlug(destSlug);
@@ -133,7 +152,14 @@ export async function createOrUpdateCard(input: CardInput) {
 }
 
 export async function deleteCard(id: string, currentTeamSlug: string) {
-  await requireOperationalManager();
+  const user = await requireCurrentUser();
+  const isManager = user.role === "admin" || user.role === "manager";
+  const isClient = user.role === "client";
+  if (!isManager && !isClient) throw new Error("Sem permissão.");
+  if (isClient) {
+    const existing = await prisma.card.findUnique({ where: { id }, select: { clientId: true } });
+    if (!existing || existing.clientId !== user.clientId) throw new Error("Sem permissão para essa demanda.");
+  }
   await prisma.card.delete({ where: { id } });
   revalidatePath(`/board/${currentTeamSlug}`);
 }
@@ -150,28 +176,36 @@ export async function moveCard(params: {
   currentTeamSlug: string;
 }) {
   const user = await requireCurrentUser();
-  if (user.role === "client") throw new Error("Clientes não podem mover tarefas.");
 
   const card = await prisma.card.findUnique({
     where: { id: params.cardId },
-    include: { team: { select: { slug: true } } },
+    include: { team: { select: { slug: true, clientId: true } } },
   });
   if (!card) return;
 
   const isPersonColumn = params.toStatus === PERSON_COLUMN_STATUS;
   const isManager = user.role === "admin" || user.role === "manager";
+  const isClient = user.role === "client";
   const isOwnCard = card.responsibleId === user.id;
+  const isOwnClientBoard = isClient && !!user.clientId && card.team.clientId === user.clientId && card.clientId === user.clientId;
+
+  // Cliente só pode mexer no próprio board.
+  if (isClient && !isOwnClientBoard) {
+    throw new Error("Sem permissão para essa demanda.");
+  }
+  if (!isManager && !isClient) {
+    // membro comum
+  }
 
   // Determina o novo responsável.
   let toResponsibleId = card.responsibleId;
   if (isPersonColumn) {
     if (!params.toResponsibleId) throw new Error("Responsável obrigatório para coluna de pessoa.");
-    // Só admin/manager reatribui card entre pessoas. Membro só move para a própria coluna.
-    if (!isManager && params.toResponsibleId !== user.id) {
+    // Cliente e admin/manager podem reatribuir livre. Membro comum só move p/ sua coluna E só seus cards.
+    if (!isManager && !isClient && params.toResponsibleId !== user.id) {
       throw new Error("Sem permissão para atribuir a demanda a outra pessoa.");
     }
-    // Membro só pode mover cards que já são dele.
-    if (!isManager && !isOwnCard) {
+    if (!isManager && !isClient && !isOwnCard) {
       throw new Error("Sem permissão para mover a demanda de outra pessoa.");
     }
     const destinationMember = await prisma.teamMember.findUnique({
@@ -187,10 +221,11 @@ export async function moveCard(params: {
       select: { restrictToManagers: true },
     });
     if (!stage) throw new Error("Etapa inválida para este quadro.");
-    if (stage.restrictToManagers && !isManager) {
+    // Restrição de etapa não vale pra cliente no próprio board (liberdade total).
+    if (stage.restrictToManagers && !isManager && !isClient) {
       throw new Error("Somente admin/gestão podem mover para esta etapa.");
     }
-    if (!isManager && !isOwnCard) {
+    if (!isManager && !isClient && !isOwnCard) {
       throw new Error("Sem permissão para mover a demanda de outra pessoa.");
     }
     // Responsável não muda em coluna de etapa.

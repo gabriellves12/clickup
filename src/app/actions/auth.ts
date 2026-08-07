@@ -35,7 +35,14 @@ export async function signIn(_prev: SignInResult | null, formData: FormData): Pr
     return { ok: false, error: "Acesso ainda não liberado para este usuário." };
   }
 
-  redirect(person.role === "client" ? "/portal" : "/inicio");
+  if (person.role === "client") {
+    // Cliente vai direto pro board do próprio cliente (novo fluxo).
+    const clientTeam = person.clientId
+      ? await prisma.team.findFirst({ where: { kind: "CLIENT", clientId: person.clientId }, select: { slug: true } })
+      : null;
+    redirect(clientTeam ? `/board/${clientTeam.slug}` : "/portal");
+  }
+  redirect("/inicio");
 }
 
 export async function signOut() {

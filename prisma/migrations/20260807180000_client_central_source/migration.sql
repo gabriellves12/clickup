@@ -1,0 +1,1 @@
+ALTER TABLE "Client" ADD COLUMN "centralSource" BOOLEAN NOT NULL DEFAULT false;

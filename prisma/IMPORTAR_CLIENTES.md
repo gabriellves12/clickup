@@ -9,6 +9,8 @@ Ele cria ou atualiza clientes pelo nome e organiza:
 - links de Drive, Figma, fotos e acessos;
 - produtos disponíveis no Kanban.
 
+A aba **Clientes** mostra somente as empresas presentes no HTML mais recente. Registros que não estiverem na central continuam preservados no banco, mas não aparecem nessa visão.
+
 Usuários e senhas de acessos técnicos presentes no HTML são importados para os campos de credencial e aparecem apenas para administradores na aba de Clientes, com cópia individual e senha mascarada. Antes de publicar em produção, esses campos devem ser protegidos por criptografia em repouso ou movidos para um cofre de senhas integrado. O arquivo de origem deve permanecer fora do deploy e fora do controle de versão.
 
 ## Validar o arquivo sem alterar o banco

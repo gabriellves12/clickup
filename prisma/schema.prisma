@@ -93,6 +93,7 @@ model Client {
   contractUrl     String?
   contractMonths  Int?
   whatsappUrl     String?
+  centralSource   Boolean   @default(false) // aparece na aba Clientes quando vem da central HTML
   portalUserLimit Int       @default(5)
   createdAt       DateTime  @default(now())
 

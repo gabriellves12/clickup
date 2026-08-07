@@ -9,17 +9,18 @@ function todayStart() {
 
 /* ---------------- KPIs globais da tela /clientes ---------------- */
 export async function getClientsOverview() {
+  const sourceClients = { centralSource: true };
   const [total, ativos, encerrados, fixos, freelas, cards, wordpress, figmas, drives, photos] = await Promise.all([
-    prisma.client.count(),
-    prisma.client.count({ where: { status: "ATIVO" } }),
-    prisma.client.count({ where: { status: "ENCERRADO" } }),
-    prisma.client.count({ where: { tipoContrato: "FIXO" } }),
-    prisma.client.count({ where: { tipoContrato: "FREELA" } }),
-    prisma.card.findMany({ select: { status: true, deadline: true, pendenteMaterial: true } }),
-    prisma.linkTreeItem.count({ where: { category: "wordpress" } }),
-    prisma.linkTreeItem.count({ where: { category: "figma" } }),
-    prisma.linkTreeItem.count({ where: { category: "drive" } }),
-    prisma.linkTreeItem.count({ where: { category: "photos" } }),
+    prisma.client.count({ where: sourceClients }),
+    prisma.client.count({ where: { ...sourceClients, status: "ATIVO" } }),
+    prisma.client.count({ where: { ...sourceClients, status: "ENCERRADO" } }),
+    prisma.client.count({ where: { ...sourceClients, tipoContrato: "FIXO" } }),
+    prisma.client.count({ where: { ...sourceClients, tipoContrato: "FREELA" } }),
+    prisma.card.findMany({ where: { client: sourceClients }, select: { status: true, deadline: true, pendenteMaterial: true } }),
+    prisma.linkTreeItem.count({ where: { category: "wordpress", linkTree: { client: sourceClients } } }),
+    prisma.linkTreeItem.count({ where: { category: "figma", linkTree: { client: sourceClients } } }),
+    prisma.linkTreeItem.count({ where: { category: "drive", linkTree: { client: sourceClients } } }),
+    prisma.linkTreeItem.count({ where: { category: "photos", linkTree: { client: sourceClients } } }),
   ]);
   const t0 = todayStart();
   const abertas = cards.filter((c) => c.status !== DONE_STATUS).length;
@@ -35,6 +36,7 @@ export type ClientRow = Awaited<ReturnType<typeof getClientsList>>[number];
 
 export async function getClientsList() {
   const clients = await prisma.client.findMany({
+    where: { centralSource: true },
     orderBy: [{ status: "asc" }, { name: "asc" }],
     include: {
       cards: {

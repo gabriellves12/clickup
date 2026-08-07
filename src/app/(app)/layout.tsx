@@ -6,7 +6,15 @@ import { AppShell, type BoardMenuItem } from "@/components/shell/AppShell";
 export default async function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (user.role === "client") redirect("/portal");
+
+  // Cliente: usa shell mínimo (sem sidebar interna nem queries pesadas). Página decide o que renderizar.
+  if (user.role === "client") {
+    return (
+      <div className="h-dvh w-full overflow-hidden bg-white text-[#1a1a1a] flex flex-col">
+        {children}
+      </div>
+    );
+  }
 
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
 
