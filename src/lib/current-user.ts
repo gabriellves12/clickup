@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -20,14 +21,18 @@ export type CurrentUser = {
 
 // Retorna o usuário logado (Supabase Auth + perfil na tabela Person) ou null.
 // O layout autenticado usa isso para redirecionar para /login quando não há sessão.
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // Sem envs configuradas ainda? Não tenta autenticar (dev inicial).
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
     return null;
   }
 
+  // Middleware já executa `supabase.auth.getUser()` a cada request e revalida
+  // a sessão. Aqui usamos `getSession()` que só lê + valida o JWT do cookie
+  // (sem network) — elimina ~200ms por request no layout.
   const supabase = await createSupabaseServerClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const authUser = session?.user;
   if (!authUser?.email) return null;
 
   const person = await prisma.person.findUnique({
@@ -58,7 +63,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     clientId: person.clientId,
     canSwitchRole: baseRole === "admin",
   };
-}
+});
 
 export async function requireCurrentUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();

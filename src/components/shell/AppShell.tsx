@@ -43,7 +43,7 @@ export function AppShell({ user, teamsSummary, children }: { user: CurrentUser; 
   return <div className="h-dvh w-full overflow-hidden bg-white text-[#1a1a1a] flex">
     <aside className={cn("h-full shrink-0 border-r border-[#ebebeb] bg-[#fafafa] flex flex-col transition-[width] duration-200 z-30", collapsed ? "w-[64px]" : "w-[224px]")}>
       <div className={cn("h-[52px] shrink-0 border-b border-[#ebebeb] flex items-center", collapsed ? "justify-center" : "px-3")}>
-        <Link href="/inicio" prefetch={false} className="min-w-0 flex items-center gap-2.5 text-[#1a1a1a] no-underline hover:no-underline">
+        <Link href="/inicio" className="min-w-0 flex items-center gap-2.5 text-[#1a1a1a] no-underline hover:no-underline">
           {collapsed ? <span className="size-7 shrink-0 grid place-items-center"><Image src="/control-icon.svg" alt="Control" width={23} height={20} className="h-[20px] w-auto" priority /></span> : <><Image src="/control-wordmark.svg" alt="Control" width={106} height={24} className="h-[24px] w-auto" priority /><span className="rounded-full bg-[#ededed] px-2 py-0.5 text-[9px] font-medium text-[#666]">Interno</span><ChevronDown className="size-3 ml-auto text-[#777]" /></>}
         </Link>
       </div>
@@ -79,11 +79,11 @@ function NavGroup({ items, path, collapsed, teamsSummary = [], boardsOpen = fals
     if (item.icon === "kanban" && !collapsed) return <div key={item.href}>
       <button type="button" onClick={onToggleBoards} aria-expanded={boardsOpen} className={cn("w-full h-9 rounded-md flex items-center px-2 gap-2 text-[11.5px] font-medium transition-colors hover:bg-[#eeeeee]", active ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}>{content}<ChevronDown className={cn("size-3 ml-auto text-[#999] transition-transform", boardsOpen && "rotate-180")} /></button>
       {boardsOpen && <div className="ml-[19px] pl-[19px] border-l border-[#e3e3e3] py-1 grid gap-px">
-        {teamsSummary.map((team) => { const selected = path === `/board/${team.slug}`; return <Link key={team.slug} href={`/board/${team.slug}`} prefetch={false} className={cn("h-7 -ml-1 px-1 rounded flex items-center gap-2 text-[10.5px] no-underline hover:no-underline transition-colors hover:bg-[#eeeeee]", selected ? "font-semibold text-[#171717]" : "text-[#777] hover:text-[#222]")}><FolderKanban className="size-3" /><span>{team.name.replace("Time ", "")}</span><span className="ml-auto mr-1 text-[9px] tabular text-[#999]">{team.cardsCount}</span></Link>; })}
+        {teamsSummary.map((team) => { const selected = path === `/board/${team.slug}`; return <Link key={team.slug} href={`/board/${team.slug}`} className={cn("h-7 -ml-1 px-1 rounded flex items-center gap-2 text-[10.5px] no-underline hover:no-underline transition-colors hover:bg-[#eeeeee]", selected ? "font-semibold text-[#171717]" : "text-[#777] hover:text-[#222]")}><FolderKanban className="size-3" /><span>{team.name.replace("Time ", "")}</span><span className="ml-auto mr-1 text-[9px] tabular text-[#999]">{team.cardsCount}</span></Link>; })}
         <button type="button" title="Criação de quadros em breve" className="h-7 -ml-1 px-1 rounded flex items-center gap-2 text-[10.5px] text-[#777] hover:text-[#222] hover:bg-[#eeeeee]"><Plus className="size-3" /><span>Criar novo</span></button>
       </div>}
     </div>;
-    return <Link key={item.href} href={item.href} prefetch={false} title={collapsed ? item.label : undefined} aria-current={active ? "page" : undefined} className={cn("h-9 rounded-md flex items-center text-[11.5px] font-medium no-underline hover:no-underline transition-colors hover:bg-[#eeeeee]", collapsed ? "justify-center" : "px-2 gap-2", active ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}>{content}</Link>;
+    return <Link key={item.href} href={item.href} title={collapsed ? item.label : undefined} aria-current={active ? "page" : undefined} className={cn("h-9 rounded-md flex items-center text-[11.5px] font-medium no-underline hover:no-underline transition-colors hover:bg-[#eeeeee]", collapsed ? "justify-center" : "px-2 gap-2", active ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}>{content}</Link>;
   })}</nav>;
 }
 
