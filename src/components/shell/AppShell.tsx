@@ -114,10 +114,7 @@ export function AppShell({ user, boards, canEditBoards, clients, overdueCount, p
             activeSlug={activeSlug}
           />
           {adminItems.length > 0 && (
-            <div className="mt-4 pt-3 border-t border-[#e9e9e9]">
-              {!collapsed && <p className="px-2 mb-1.5 text-[9px] font-medium uppercase tracking-[.12em] text-[#999]">Admin</p>}
-              <NavGroup items={adminItems} path={path} collapsed={collapsed} activeSlug={activeSlug} />
-            </div>
+            <NavGroup items={adminItems} path={path} collapsed={collapsed} activeSlug={activeSlug} />
           )}
         </div>
 

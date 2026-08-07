@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Check, Copy, Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { Avatar, IconButton } from "@/components/ui/primitives";
 import { CategoryIcon, IcClose, IcExternal } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -27,10 +28,12 @@ const WHATSAPP_GREEN = "#25D366";
 
 export function ClientQuickView({
   client, open, onOpenChange,
+  canViewCredentials,
 }: {
   client: ClientRow | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  canViewCredentials: boolean;
 }) {
   if (!client) return null;
 
@@ -148,9 +151,9 @@ export function ClientQuickView({
               {importantLinks.length === 0 ? (
                 <span className="text-[12.5px] text-text-3">Sem links cadastrados.</span>
               ) : (
-                <div className="grid gap-1">
+                <div className="grid gap-2 sm:grid-cols-2">
                   {importantLinks.map((l) => (
-                    <LinkRow key={l.id} category={l.category} label={l.label} url={l.url} observation={l.observation} />
+                    <ResourceCard key={l.id} link={l} />
                   ))}
                 </div>
               )}
@@ -163,7 +166,7 @@ export function ClientQuickView({
               ) : (
                 <div className="grid gap-1">
                   {accessLinks.map((l) => (
-                    <LinkRow key={l.id} category={l.category} label={l.label} url={l.url} observation={l.observation} />
+                    <AccessCard key={l.id} link={l} canViewCredentials={canViewCredentials} />
                   ))}
                 </div>
               )}
@@ -262,25 +265,56 @@ function LinkChip({ href, label }: { href: string; label: string }) {
   );
 }
 
-function LinkRow({ category, label, url, observation }: {
-  category: string; label: string; url: string | null; observation: string | null;
-}) {
+type ClientLink = ClientRow["links"][number];
+
+function ResourceCard({ link }: { link: ClientLink }) {
+  const theme: Record<string, string> = {
+    drive: "bg-[#edf5f3] text-[#377365] border-[#dceae5]",
+    figma: "bg-[#f1edfb] text-[#6950a5] border-[#e4dcf8]",
+    photos: "bg-[#f8f0e7] text-[#94633b] border-[#f0e0cf]",
+    product: "bg-[#eef1f8] text-[#4a639d] border-[#dfe5f4]",
+  };
   const body = (
-    <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-surface-2 transition-colors">
-      <CategoryIcon category={category} className="size-3.5 text-text-3" />
-      <span className="text-[13px] text-text flex-1 min-w-0 truncate">{label}</span>
-      {observation && (
-        <span className="text-[10.5px] text-text-3 mono truncate max-w-[140px]">{observation}</span>
-      )}
-      {url && <IcExternal className="size-3 text-text-3" />}
+    <div className={cn("group flex min-h-14 items-center gap-2.5 rounded-lg border px-3 py-2.5 transition-transform hover:-translate-y-px", theme[link.category] ?? "bg-surface-2 text-text-2 border-border")}>
+      <span className="grid size-7 shrink-0 place-items-center rounded-md bg-white/70"><CategoryIcon category={link.category} className="size-3.5" /></span>
+      <span className="min-w-0 flex-1"><b className="block truncate text-[11px] font-medium text-text">{link.label}</b><small className="mt-0.5 block text-[9px] opacity-70">{link.category === "figma" ? "Arquivo no Figma" : link.category === "drive" ? "Pasta no Drive" : link.category === "photos" ? "Banco de imagens" : "Produto"}</small></span>
+      {link.url && <IcExternal className="size-3 shrink-0 opacity-55 transition-opacity group-hover:opacity-100" />}
     </div>
   );
-  if (!url) return body;
+  return link.url ? <a href={link.url} target="_blank" rel="noopener noreferrer" className="no-underline hover:no-underline">{body}</a> : body;
+}
+
+function AccessCard({ link, canViewCredentials }: { link: ClientLink; canViewCredentials: boolean }) {
+  const isWordpress = link.category === "wordpress";
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="no-underline hover:no-underline">
-      {body}
-    </a>
+    <div className={cn("rounded-lg border p-3", isWordpress ? "border-[#d8e1ef] bg-[#f5f8fc]" : "border-border bg-surface-2/50")}>
+      <div className="flex items-center gap-2.5">
+        <span className={cn("grid size-7 shrink-0 place-items-center rounded-md", isWordpress ? "bg-[#e2ebf7] text-[#43658d]" : "bg-surface text-text-3 border border-border")}><CategoryIcon category={link.category} className="size-3.5" /></span>
+        <div className="min-w-0 flex-1"><b className="block truncate text-[11px] font-medium text-text">{link.label}</b><span className="block text-[9px] text-text-3">{isWordpress ? "Painel WordPress" : link.category === "cloudflare" ? "Cloudflare" : "Acesso interno"}</span></div>
+        {link.url && <a href={link.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-2 text-[9px] font-medium text-text-2 hover:text-text">Abrir <IcExternal className="size-3" /></a>}
+      </div>
+      {link.observation && <p className="mt-2 text-[9.5px] text-text-3">{link.observation}</p>}
+      {canViewCredentials && (link.username || link.secret) ? (
+        <div className="mt-3 grid gap-1.5 border-t border-[#dfe6ef] pt-2.5 sm:grid-cols-2">
+          {link.username && <CredentialField label="Usuário" value={link.username} />}
+          {link.secret && <CredentialField label="Senha" value={link.secret} secret />}
+        </div>
+      ) : (
+        <p className="mt-2.5 inline-flex items-center gap-1.5 text-[9px] text-text-3"><LockKeyhole className="size-3" />{canViewCredentials ? "Sem credenciais cadastradas." : "Credenciais disponíveis somente para administradores."}</p>
+      )}
+    </div>
   );
+}
+
+function CredentialField({ label, value, secret = false }: { label: string; value: string; secret?: boolean }) {
+  const [revealed, setRevealed] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  async function copyValue() {
+    await navigator.clipboard.writeText(value);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+  return <div className="rounded-md border border-[#dce3ec] bg-white px-2 py-1.5"><div className="mb-1 flex items-center justify-between"><span className="text-[8px] font-semibold uppercase tracking-[.11em] text-text-3">{label}</span><div className="flex items-center gap-1">{secret && <button type="button" onClick={() => setRevealed((current) => !current)} className="grid size-4 place-items-center text-text-3 hover:text-text" aria-label={revealed ? "Ocultar senha" : "Exibir senha"}>{revealed ? <EyeOff className="size-3" /> : <Eye className="size-3" />}</button>}<button type="button" onClick={() => void copyValue()} className="grid size-4 place-items-center text-text-3 hover:text-text" aria-label={`Copiar ${label}`}>{copied ? <Check className="size-3 text-[#418164]" /> : <Copy className="size-3" />}</button></div></div><span className="block truncate font-mono text-[9.5px] text-text">{secret && !revealed ? "••••••••••••" : value}</span></div>;
 }
 
 function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }

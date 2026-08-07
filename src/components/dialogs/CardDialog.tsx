@@ -7,6 +7,7 @@ import { useTransition } from "react";
 import { Button, Field, Input, Select, Textarea } from "@/components/ui/primitives";
 import { CategoryIcon, IcAlert, IcChevronDown, IcClose, IcExternal, IcPlus, IcTrash } from "@/components/icons";
 import { createOrUpdateCard, deleteCard } from "@/app/actions/cards";
+import { addComment, deleteComment, listComments, type CommentLite } from "@/app/actions/comments";
 import { createClientQuick, createProductQuick } from "@/app/actions/catalog";
 import { cn } from "@/lib/cn";
 import type { CardLite, ClientWithLinks, DemandTypeLite, PersonLite, ProductLite } from "@/components/board/types";
@@ -73,6 +74,18 @@ export function CardDialog({
   }), [editing, defaults, clients, people, flow]);
 
   const [form, setForm] = React.useState(initial);
+
+  // Comentários (lazy load ao abrir card em edição)
+  const [comments, setComments] = React.useState<CommentLite[]>([]);
+  const [commentsLoaded, setCommentsLoaded] = React.useState(false);
+  React.useEffect(() => {
+    if (!open || !editing?.id) { setComments([]); setCommentsLoaded(false); return; }
+    let cancelled = false;
+    listComments(editing.id).then((rows) => {
+      if (!cancelled) { setComments(rows); setCommentsLoaded(true); }
+    }).catch(() => { if (!cancelled) setCommentsLoaded(true); });
+    return () => { cancelled = true; };
+  }, [open, editing?.id]);
 
   const client = localClients.find((item) => item.id === form.clientId);
   const product = localProducts.find((item) => item.id === form.productId);
@@ -169,23 +182,79 @@ export function CardDialog({
           </header>
 
           <form onSubmit={handleSubmit} className="contents">
-            <fieldset disabled={readOnly} className="flex-1 overflow-y-auto scrollbar-clean p-5 grid gap-4 disabled:opacity-100">
-              {editing && <div className="bg-white px-2 sm:px-4">
-                <Input value={form.title} onChange={(event) => { set("title", event.target.value); setTitleWasEdited(true); }} className="h-auto w-full border-0 px-0 py-2 text-[22px] font-semibold tracking-[-.025em] shadow-none focus:ring-0" />
-                <div className="mt-4 grid sm:grid-cols-2 gap-x-10 gap-y-3 border-b border-[#e8e8e8] pb-6">
-                  <MetaField label="Status"><Select value={form.status} onChange={(event) => set("status", event.target.value)}><option value={PERSON_COLUMN_STATUS}>Coluna da pessoa</option>{destFlow.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</Select></MetaField>
-                  <MetaField label="Responsável"><Select value={form.responsibleId} onChange={(event) => set("responsibleId", event.target.value)}>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</Select></MetaField>
-                  <MetaField label="Datas"><div className="grid grid-cols-2 gap-2"><Input type="date" value={form.startDate} onChange={(event) => set("startDate", event.target.value)} /><Input type="date" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} /></div></MetaField>
-                  <MetaField label="Prioridade"><Select value={form.priority} onChange={(event) => set("priority", event.target.value)}>{priorities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></MetaField>
-                  <MetaField label="Etiqueta"><Select value={form.clientId} onChange={(event) => updateDefinition({ clientId: event.target.value, productId: "" })}>{localClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></MetaField>
-                  <MetaField label="Produto"><Select value={form.productId} onChange={(event) => updateDefinition({ productId: event.target.value })}>{clientProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></MetaField>
+            <div className="flex-1 overflow-y-auto scrollbar-clean flex flex-col">
+            <fieldset disabled={readOnly} className="p-5 grid gap-4 disabled:opacity-100">
+              {editing && (
+                <div className="grid gap-5">
+                  {/* Título */}
+                  <Input
+                    value={form.title}
+                    onChange={(event) => { set("title", event.target.value); setTitleWasEdited(true); }}
+                    className="h-auto w-full border-0 px-0 py-1 text-[22px] font-semibold tracking-[-.025em] shadow-none focus:ring-0"
+                  />
+
+                  {/* Info block: Status | Responsável | Etiqueta | Data de entrega */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg border border-border bg-surface-2 p-3">
+                    <InfoField label="Status">
+                      <Select value={form.status} onChange={(event) => set("status", event.target.value)} className="h-8 text-[12px]">
+                        <option value={PERSON_COLUMN_STATUS}>Coluna da pessoa</option>
+                        {destFlow.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+                      </Select>
+                    </InfoField>
+                    <InfoField label="Responsável">
+                      <Select value={form.responsibleId} onChange={(event) => set("responsibleId", event.target.value)} className="h-8 text-[12px]">
+                        {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                      </Select>
+                    </InfoField>
+                    <InfoField label="Etiqueta do cliente">
+                      <Select value={form.clientId} onChange={(event) => updateDefinition({ clientId: event.target.value, productId: "" })} className="h-8 text-[12px]">
+                        {localClients.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </Select>
+                    </InfoField>
+                    <InfoField label="Data de entrega">
+                      <Input type="date" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} className="h-8 text-[12px]" />
+                    </InfoField>
+                  </div>
+
+                  {/* Briefing */}
+                  <ContentBlock title="Briefing">
+                    <Textarea
+                      required rows={5}
+                      value={form.briefing}
+                      onChange={(event) => set("briefing", event.target.value)}
+                      placeholder="Escreva o direcionamento da demanda…"
+                      className="text-[13px] leading-5"
+                    />
+                  </ContentBlock>
+
+                  {/* Copy + Link do Drive */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <ContentBlock title="Copy">
+                      <Input type="url" value={form.copyUrl} onChange={(event) => set("copyUrl", event.target.value)} placeholder="Cole o link enviado pelo cliente" className="h-9" />
+                    </ContentBlock>
+                    <ContentBlock title="Link do Drive">
+                      <Input type="url" value={form.attachmentDriveUrl} onChange={(event) => set("attachmentDriveUrl", event.target.value)} placeholder={product?.driveUrl ?? "https://drive.google.com/…"} className="h-9" />
+                    </ContentBlock>
+                  </div>
+
+                  {/* Central de Links */}
+                  <ContentBlock title="Central de Links">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <CentralLink label="Fotos" href={pickPhotos(client, product)} />
+                      <CentralLink label="Figma principal" href={pickCentralLink(client, "figma")} />
+                      <CentralLink label="Figma do produto" href={product?.figmaUrl ?? null} />
+                    </div>
+                    <div className="mt-3 border-t border-hairline pt-3">
+                      <span className="text-[9.5px] font-medium uppercase tracking-[.08em] text-text-3">Acessos</span>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                        <CentralLink label="WordPress" href={pickCentralLink(client, "wordpress")} />
+                        <CentralLink label="Cloudflare" href={pickCentralLink(client, "cloudflare")} />
+                        <CentralLink label="Hospedagem" href={pickCentralLink(client, "hosting")} />
+                      </div>
+                    </div>
+                  </ContentBlock>
                 </div>
-                <TaskSheetRow icon="▣" label="Briefing"><Textarea required rows={7} value={form.briefing} onChange={(event) => set("briefing", event.target.value)} placeholder="Escreva o direcionamento da demanda…" className="border-0 px-0 text-[14px] font-medium leading-6 shadow-none focus:ring-0" /></TaskSheetRow>
-                <TaskSheetRow icon="✎" label="Copy"><Input type="url" value={form.copyUrl} onChange={(event) => set("copyUrl", event.target.value)} placeholder="Cole o link enviado pelo cliente" className="border-0 px-0 shadow-none focus:ring-0" /></TaskSheetRow>
-                <TaskSheetRow icon="◩" label="Formato"><span className="text-[13px] font-semibold uppercase">{form.variations.join(", ") || "Não definido"}</span></TaskSheetRow>
-                <TaskSheetRow icon="◉" label="Figma">{product?.figmaUrl ? <a href={product.figmaUrl} target="_blank" rel="noreferrer" className="text-[13px] font-medium text-[#555]">Abrir arquivo do produto ↗</a> : <span className="text-[13px] text-[#999]">Preenchido pelo cadastro do produto</span>}</TaskSheetRow>
-                <TaskSheetRow icon="■" label="Drive para anexar"><Input type="url" value={form.attachmentDriveUrl} onChange={(event) => set("attachmentDriveUrl", event.target.value)} placeholder={product?.driveUrl ?? "Cole um link externo somente quando necessário"} className="border-0 px-0 shadow-none focus:ring-0" /></TaskSheetRow>
-              </div>}
+              )}
               {!editing && <>
               <Section number="01" title="Definição" subtitle="Escolha o contexto; o restante se organiza sozinho.">
                 <div className="grid sm:grid-cols-2 gap-3">
@@ -248,6 +317,22 @@ export function CardDialog({
               </>}
             </fieldset>
 
+            {editing && (
+              <section className="border-t border-border bg-surface-2 p-5">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[.08em] text-text-2">Comentários</h3>
+                <CommentsThread
+                  cardId={editing.id}
+                  comments={comments}
+                  loaded={commentsLoaded}
+                  canDelete={!readOnly}
+                  currentTeamSlug={currentTeamSlug}
+                  onAdded={(c) => setComments((prev) => [...prev, c])}
+                  onDeleted={(id) => setComments((prev) => prev.filter((c) => c.id !== id))}
+                />
+              </section>
+            )}
+            </div>
+
             <footer className="shrink-0 min-h-[70px] flex items-center gap-2 px-6 py-3 bg-surface border-t border-border">
               {!readOnly && (editing ? <Button type="button" variant="ghost" onClick={handleDelete} className="text-danger hover:text-danger hover:bg-danger/10"><IcTrash className="size-3.5" /> Excluir</Button> : <span className="text-[11px] text-text-3">{form.briefing.trim() ? "Pronto para criar" : "Briefing obrigatório"}</span>)}
               <span className="flex-1" /><Dialog.Close asChild><Button type="button" variant="ghost">{readOnly ? "Fechar" : "Cancelar"}</Button></Dialog.Close>{!readOnly && <Button type="submit" variant="primary" size="lg" disabled={pending}>{pending ? "Salvando…" : editing ? "Salvar alterações" : "Criar task"}<span className="ml-2">→</span></Button>}
@@ -280,4 +365,183 @@ function MetaField({ label, children }: { label: string; children: React.ReactNo
 }
 function TaskSheetRow({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
   return <section className="grid grid-cols-[22px_1fr] gap-2 border-b border-[#e8e8e8] py-6"><span className="text-[15px] text-[#888]">{icon}</span><div><h3 className="mb-3 text-[13px] font-bold uppercase tracking-[-.01em]">{label}</h3>{children}</div></section>;
+}
+
+/* ------------------------- Info / Content / Central de Links ------------------------- */
+
+function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="grid gap-1">
+      <span className="text-[9px] font-medium uppercase tracking-[.08em] text-text-3">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function ContentBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-lg border border-border bg-surface p-3">
+      <h4 className="text-[10px] font-semibold uppercase tracking-[.08em] text-text-2 mb-2">{title}</h4>
+      {children}
+    </section>
+  );
+}
+
+function CentralLink({ label, href }: { label: string; href: string | null | undefined }) {
+  const hasLink = Boolean(href);
+  return (
+    <a
+      href={hasLink ? href! : undefined}
+      target={hasLink ? "_blank" : undefined}
+      rel="noreferrer"
+      className={cn(
+        "flex items-center gap-2 rounded-md border px-2.5 py-2 text-left no-underline",
+        hasLink
+          ? "border-border bg-surface-2 hover:bg-surface-3 hover:no-underline"
+          : "border-dashed border-hairline bg-transparent pointer-events-none",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="text-[9.5px] uppercase tracking-[.06em] text-text-3">{label}</div>
+        <div className={cn("text-[11px] font-medium truncate", hasLink ? "text-text" : "text-text-3")}>
+          {hasLink ? "Abrir link" : "Não definido"}
+        </div>
+      </div>
+      {hasLink && <IcExternal className="size-3 text-text-3 shrink-0" />}
+    </a>
+  );
+}
+
+function pickCentralLink(client: ClientWithLinks | undefined, category: string): string | null {
+  if (!client) return null;
+  const item = client.links.find((l) => !l.parentId && l.category === category && l.url);
+  return item?.url ?? null;
+}
+
+function pickPhotos(client: ClientWithLinks | undefined, product: ProductLite | undefined): string | null {
+  if (product?.photosUrl) return product.photosUrl;
+  return pickCentralLink(client, "photos");
+}
+
+/* ------------------------- Comments thread ------------------------- */
+
+function CommentsThread({
+  cardId, comments, loaded, canDelete, currentTeamSlug, onAdded, onDeleted,
+}: {
+  cardId: string;
+  comments: CommentLite[];
+  loaded: boolean;
+  canDelete: boolean;
+  currentTeamSlug: string;
+  onAdded: (c: CommentLite) => void;
+  onDeleted: (id: string) => void;
+}) {
+  const [body, setBody] = React.useState("");
+  const [mediaInput, setMediaInput] = React.useState("");
+  const [pending, startTransition] = useTransition();
+
+  function submit() {
+    const text = body.trim();
+    const links = mediaInput.split(/\s+/).map((s) => s.trim()).filter(Boolean);
+    if (!text && links.length === 0) return;
+    startTransition(async () => {
+      try {
+        const created = await addComment({ cardId, body: text, mediaUrls: links, currentTeamSlug });
+        onAdded(created);
+        setBody(""); setMediaInput("");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Falha ao comentar.");
+      }
+    });
+  }
+
+  function remove(id: string) {
+    if (!confirm("Excluir este comentário?")) return;
+    startTransition(async () => {
+      try {
+        await deleteComment({ id, currentTeamSlug });
+        onDeleted(id);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Não foi possível excluir.");
+      }
+    });
+  }
+
+  return (
+    <div className="mt-3 grid gap-3">
+      {!loaded && <p className="text-[10.5px] text-text-3">Carregando comentários…</p>}
+      {loaded && comments.length === 0 && (
+        <p className="text-[10.5px] text-text-3">Nenhum comentário ainda. Compartilhe referências, links e feedbacks aqui.</p>
+      )}
+      {comments.map((c) => (
+        <article key={c.id} className="rounded-lg border border-border bg-surface p-3">
+          <header className="flex items-center gap-2">
+            <span className="size-6 shrink-0 rounded-full bg-text/85 text-bg text-[9.5px] font-semibold grid place-items-center">
+              {c.author.initials}
+            </span>
+            <span className="text-[11px] font-medium text-text truncate">{c.author.name}</span>
+            <span className="text-[9.5px] text-text-3 tabular ml-auto">{formatCommentDate(c.createdAt)}</span>
+            {canDelete && (
+              <button
+                type="button"
+                onClick={() => remove(c.id)}
+                className="text-[9.5px] text-text-3 hover:text-danger transition-colors"
+                aria-label="Excluir comentário"
+                disabled={pending}
+              >
+                Excluir
+              </button>
+            )}
+          </header>
+          {c.body && <p className="mt-2 text-[12px] leading-5 text-text whitespace-pre-wrap">{c.body}</p>}
+          {c.mediaUrls.length > 0 && (
+            <div className="mt-2 grid gap-1.5">
+              {c.mediaUrls.map((url) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10.5px] text-text-2 underline decoration-hairline hover:text-text truncate block"
+                >
+                  {url}
+                </a>
+              ))}
+            </div>
+          )}
+        </article>
+      ))}
+
+      <div className="rounded-lg border border-border bg-surface p-3 grid gap-2">
+        <Textarea
+          rows={3}
+          value={body}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Escreva um comentário, feedback ou instrução…"
+          className="text-[12px] leading-5"
+        />
+        <Input
+          value={mediaInput}
+          onChange={(event) => setMediaInput(event.target.value)}
+          placeholder="Cole URLs de imagens ou referências (separadas por espaço)"
+          className="h-9 text-[11px]"
+        />
+        <div className="flex items-center gap-2">
+          <span className="text-[9.5px] text-text-3">{body.length ? `${body.length} caracteres` : ""}</span>
+          <span className="flex-1" />
+          <Button type="button" size="sm" variant="primary" onClick={submit} disabled={pending || (!body.trim() && !mediaInput.trim())}>
+            {pending ? "Enviando…" : "Comentar"}
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function formatCommentDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const same = d.toDateString() === now.toDateString();
+  if (same) return `hoje ${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }

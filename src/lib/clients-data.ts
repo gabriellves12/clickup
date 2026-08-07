@@ -64,7 +64,8 @@ export async function getClientsList() {
       totalCards: c.cards.length,
       links: (c.linkTree?.items ?? []).map((i) => ({
         id: i.id, category: i.category, label: i.label,
-        url: i.url, observation: i.observation, parentId: i.parentId,
+        url: i.url, observation: i.observation, username: i.username,
+        secret: i.secret, parentId: i.parentId,
         order: i.order,
       })),
     };

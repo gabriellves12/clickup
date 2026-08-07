@@ -10,6 +10,8 @@ export async function createLinkItem(input: {
   label: string;
   url?: string;
   observation?: string;
+  username?: string;
+  secret?: string;
   parentId?: string | null;
   currentTeamSlug: string;
 }) {
@@ -29,6 +31,8 @@ export async function createLinkItem(input: {
       label: input.label.trim(),
       url: input.url?.trim() || null,
       observation: input.observation?.trim() || null,
+      username: input.username?.trim() || null,
+      secret: input.secret?.trim() || null,
       parentId: input.parentId ?? null,
       order: (max._max.order ?? -1) + 1,
     },
@@ -41,6 +45,8 @@ export async function updateLinkItem(input: {
   label?: string;
   url?: string | null;
   observation?: string | null;
+  username?: string | null;
+  secret?: string | null;
   category?: string;
   currentTeamSlug: string;
 }) {
@@ -51,6 +57,8 @@ export async function updateLinkItem(input: {
       label: input.label,
       url: input.url ?? null,
       observation: input.observation ?? null,
+      username: input.username ?? null,
+      secret: input.secret ?? null,
       category: input.category,
     },
   });

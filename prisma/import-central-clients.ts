@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Prisma, PrismaClient } from "@prisma/client";
 
-type SourceLink = { label: string; url: string | null };
+type SourceLink = { label: string; url: string | null; username: string | null; secret: string | null };
 type SourceClient = {
   name: string;
   drive: SourceLink[];
@@ -84,16 +84,18 @@ function arrayField(block: string, field: string) {
 function linkFromBlock(block: string): SourceLink | null {
   const label = stringField(block, "r");
   if (!label) return null;
+  const username = stringField(block, "usuario");
+  const secret = stringField(block, "senha");
   const direct = stringField(block, "u");
-  if (direct) return { label, url: direct };
+  if (direct) return { label, url: direct, username, secret };
 
   const helper = block.match(/\bu\s*:\s*(dr|fg)\("((?:\\.|[^"\\])*)"\)/);
-  if (!helper) return { label, url: null };
+  if (!helper) return { label, url: null, username, secret };
   const value = unquote(helper[2]);
   const url = helper[1] === "dr"
     ? `https://drive.google.com/drive/folders/${value}`
     : `https://www.figma.com/design/${value}${figmaQuery}`;
-  return { label, url };
+  return { label, url, username, secret };
 }
 
 function linksFrom(block: string, field: string) {
@@ -171,6 +173,8 @@ async function syncClient(db: Prisma.TransactionClient, source: SourceClient) {
         category: item.category,
         label: item.label,
         url: item.url,
+        username: item.username,
+        secret: item.secret,
         order,
       })),
     });

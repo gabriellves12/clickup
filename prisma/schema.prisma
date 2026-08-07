@@ -61,6 +61,7 @@ model Person {
   teams  TeamMember[]
   cards  Card[]
   client Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  comments Comment[]
 
   @@index([clientId])
 }
@@ -149,6 +150,8 @@ model LinkTreeItem {
   label       String
   url         String?
   observation String? // login, notas
+  username    String?
+  secret      String? // senha/token; exibido somente a administradores
   parentId    String? // aninhamento (produtos por pasta / figma)
   order       Int      @default(0)
   createdAt   DateTime @default(now())
@@ -194,6 +197,7 @@ model Card {
   demandType  DemandType? @relation(fields: [demandTypeId], references: [id], onDelete: SetNull)
   responsible Person      @relation(fields: [responsibleId], references: [id])
   team        Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  comments    Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -202,6 +206,20 @@ model Card {
   @@index([teamId, deadline])
   @@index([clientId, clientStatus, order])
   @@index([status, updatedAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  cardId    String
+  authorId  String
+  body      String
+  mediaUrls String   @default("[]") // JSON de string[]
+  createdAt DateTime @default(now())
+
+  card   Card   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  author Person @relation(fields: [authorId], references: [id])
+
+  @@index([cardId, createdAt])
 }
 
 // -----------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { getClientsList, getClientsOverview } from "@/lib/clients-data";
 import { ClientsList } from "@/components/clients/ClientsList";
+import { requireCurrentUser } from "@/lib/current-user";
 
 function KpiCard({ label, value, hint, tone }: {
   label: string; value: React.ReactNode; hint?: string; tone?: "danger";
@@ -21,7 +22,7 @@ function KpiCard({ label, value, hint, tone }: {
 }
 
 export default async function ClientsPage() {
-  const [overview, clients] = await Promise.all([getClientsOverview(), getClientsList()]);
+  const [user, overview, clients] = await Promise.all([requireCurrentUser(), getClientsOverview(), getClientsList()]);
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto scrollbar-clean">
@@ -51,7 +52,7 @@ export default async function ClientsPage() {
           <KpiCard label="Encerrados" value={overview.encerrados} hint="Parceria finalizada" />
         </div>
 
-        <ClientsList clients={clients} />
+        <ClientsList clients={clients} canViewCredentials={user.role === "admin"} />
       </div>
     </div>
   );
