@@ -131,6 +131,25 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+html[data-theme="dark"] {
+  --bg: #141414;
+  --surface: #1c1c1c;
+  --surface-2: #242424;
+  --surface-3: #2c2c2c;
+  --border: #363636;
+  --border-strong: #484848;
+  --hairline: #303030;
+  --text: #f4f4f4;
+  --text-2: #c6c6c6;
+  --text-3: #929292;
+  --accent: #f3f3f3;
+  --accent-2: #d8d8d8;
+  --accent-fg: #171717;
+  color-scheme: dark;
+}
+html[data-theme="dark"] body { background: var(--bg); color: var(--text); }
+.field { height: 34px; width: 100%; border: 1px solid #dedede; border-radius: 6px; background: #fff; padding: 0 10px; color: #222; font-size: 10.5px; outline: none; }
+.field:focus { border-color: #555; box-shadow: 0 0 0 3px rgba(0,0,0,.08); }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: none; }
 ::selection { background: color-mix(in oklab, var(--accent) 32%, transparent); }

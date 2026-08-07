@@ -154,6 +154,16 @@ export async function deleteColumn(id: string) {
   revalidatePath(`/board/${status.team.slug}`);
 }
 
+export async function setColumnRestriction(input: { id: string; restrictToManagers: boolean }) {
+  await assertEditor();
+  const status = await prisma.teamStatus.update({
+    where: { id: input.id },
+    data: { restrictToManagers: input.restrictToManagers },
+    include: { team: { select: { slug: true } } },
+  });
+  revalidatePath(`/board/${status.team.slug}`);
+}
+
 export async function reorderColumn(input: {
   id: string;
   beforeId?: string | null;

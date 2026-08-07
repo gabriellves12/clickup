@@ -2,6 +2,10 @@
 // Quadros e colunas de status vivem no banco (models Team + TeamStatus) —
 // consulte `src/lib/teams.ts`.
 
+// Sentinela para cards que estão na coluna do responsável (sem etapa atribuída).
+// Qualquer outro valor de Card.status deve bater com um TeamStatus.key.
+export const PERSON_COLUMN_STATUS = "PERSON_COLUMN";
+
 export type StatusKey = string;
 
 export interface StatusDef {

@@ -12,6 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="pt-BR">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: "try { document.documentElement.dataset.theme = localStorage.getItem('control-theme') === 'dark' ? 'dark' : 'light'; } catch {}" }} />
         <link
           rel="preload"
           href="/fonts/GoogleSansFlex-Regular.ttf"

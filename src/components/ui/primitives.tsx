@@ -200,8 +200,8 @@ export function StatusPill({
 
 // ---------- Avatar ----------
 export function Avatar({
-  initials, colorKey = "av-1", size = "md", className,
-}: { initials: string; colorKey?: string; size?: "sm" | "md" | "lg"; className?: string }) {
+  initials, colorKey = "av-1", size = "md", className, imageUrl,
+}: { initials: string; colorKey?: string; size?: "sm" | "md" | "lg"; className?: string; imageUrl?: string | null }) {
   const grad: Record<string, string> = {
     "av-1": "linear-gradient(135deg,#171717,#525252)",
     "av-2": "linear-gradient(135deg,#262626,#737373)",
@@ -222,7 +222,7 @@ export function Avatar({
       style={{ backgroundImage: grad[colorKey] ?? grad["av-1"] }}
       aria-hidden
     >
-      {initials}
+      {imageUrl ? <img src={imageUrl} alt="" className="size-full object-cover" /> : initials}
     </span>
   );
 }

@@ -14,6 +14,7 @@ export type CurrentUser = {
   name: string;
   email: string;
   initials: string;
+  avatarUrl: string | null;
   role: UserRole;
   clientId: string | null;
   canSwitchRole: boolean;
@@ -38,7 +39,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const person = await prisma.person.findUnique({
     where: { email: authUser.email.toLowerCase() },
   });
-  if (!person) return null;
+  if (!person || !person.accessEnabled) return null;
 
   // Override temporário de papel (Modo Admin/Membro no rodapé da sidebar).
   // Só admins podem trocar de papel para testar visões.
@@ -59,6 +60,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     name: person.name,
     email: person.email,
     initials: person.initials,
+    avatarUrl: person.avatarUrl,
     role,
     clientId: person.clientId,
     canSwitchRole: baseRole === "admin",

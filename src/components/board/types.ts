@@ -10,6 +10,7 @@ export interface FlowColumnDef {
   label: string;
   order: number;
   tone: string | null;
+  restrictToManagers: boolean;
 }
 
 export interface CardLite {

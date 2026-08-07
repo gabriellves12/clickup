@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getWebRoutingTeamSlug } from "@/lib/teams";
 import { requireCurrentUser, requireOperationalManager } from "@/lib/current-user";
+import { PERSON_COLUMN_STATUS } from "@/lib/board-config";
 
 // Roteia por tipo do projeto para o slug do time destino.
 // PAGINA vai pro time de web (convenção); qualquer outro fica no time atual.
@@ -18,15 +19,6 @@ async function statusKeysForTeamSlug(slug: string): Promise<Set<string>> {
     include: { statuses: { select: { key: true } } },
   });
   return new Set(team?.statuses.map((s) => s.key) ?? []);
-}
-
-async function firstStatusKeyForTeamId(teamId: string): Promise<string> {
-  const first = await prisma.teamStatus.findFirst({
-    where: { teamId },
-    orderBy: { order: "asc" },
-    select: { key: true },
-  });
-  return first?.key ?? "EM_PRODUCAO";
 }
 
 type CardInput = {
@@ -62,9 +54,11 @@ export async function createOrUpdateCard(input: CardInput) {
   const teamId = destTeam.id;
 
   const flowKeys = await statusKeysForTeamSlug(destSlug);
-  const status = flowKeys.has(input.status)
+  // Card novo cai por padrão na coluna do responsável (PERSON_COLUMN).
+  // Se um status válido (PERSON_COLUMN ou etapa existente) foi passado, respeita.
+  const status = input.status === PERSON_COLUMN_STATUS || flowKeys.has(input.status)
     ? input.status
-    : await firstStatusKeyForTeamId(teamId);
+    : PERSON_COLUMN_STATUS;
 
   const data = {
     title: input.title.trim(),
@@ -111,43 +105,77 @@ export async function deleteCard(id: string, currentTeamSlug: string) {
   revalidatePath(`/board/${currentTeamSlug}`);
 }
 
-// Movimentação (DnD): apenas dentro do mesmo time+pessoa, muda status + reordena
+// Movimentação flat: card vive em UMA coluna. Se toStatus === PERSON_COLUMN,
+// vai para a coluna do responsável (toResponsibleId obrigatório). Caso contrário,
+// vai para uma coluna de etapa (responsável não muda — server-side ignora troca).
 export async function moveCard(params: {
   cardId: string;
-  toStatus: string;
-  toResponsibleId: string;
+  toStatus: string; // PERSON_COLUMN | TeamStatus.key
+  toResponsibleId?: string | null; // usado só quando toStatus === PERSON_COLUMN
   beforeCardId?: string | null;
   afterCardId?: string | null;
   currentTeamSlug: string;
 }) {
   const user = await requireCurrentUser();
   if (user.role === "client") throw new Error("Clientes não podem mover tarefas.");
+
   const card = await prisma.card.findUnique({
     where: { id: params.cardId },
     include: { team: { select: { slug: true } } },
   });
   if (!card) return;
 
-  const allowedStatuses = await statusKeysForTeamSlug(card.team.slug);
-  if (!allowedStatuses.has(params.toStatus)) throw new Error("Etapa inválida para este quadro.");
+  const isPersonColumn = params.toStatus === PERSON_COLUMN_STATUS;
+  const isManager = user.role === "admin" || user.role === "manager";
+  const isOwnCard = card.responsibleId === user.id;
 
-  const destinationMember = await prisma.teamMember.findUnique({
-    where: { teamId_personId: { teamId: card.teamId, personId: params.toResponsibleId } },
-    select: { personId: true },
-  });
-  if (!destinationMember) throw new Error("Responsável inválido para este quadro.");
+  // Determina o novo responsável.
+  let toResponsibleId = card.responsibleId;
+  if (isPersonColumn) {
+    if (!params.toResponsibleId) throw new Error("Responsável obrigatório para coluna de pessoa.");
+    // Só admin/manager reatribui card entre pessoas. Membro só move para a própria coluna.
+    if (!isManager && params.toResponsibleId !== user.id) {
+      throw new Error("Sem permissão para atribuir a demanda a outra pessoa.");
+    }
+    // Membro só pode mover cards que já são dele.
+    if (!isManager && !isOwnCard) {
+      throw new Error("Sem permissão para mover a demanda de outra pessoa.");
+    }
+    const destinationMember = await prisma.teamMember.findUnique({
+      where: { teamId_personId: { teamId: card.teamId, personId: params.toResponsibleId } },
+      select: { personId: true },
+    });
+    if (!destinationMember) throw new Error("Responsável inválido para este quadro.");
+    toResponsibleId = params.toResponsibleId;
+  } else {
+    // Coluna de etapa: valida que a etapa existe e checa restrição.
+    const stage = await prisma.teamStatus.findFirst({
+      where: { teamId: card.teamId, key: params.toStatus },
+      select: { restrictToManagers: true },
+    });
+    if (!stage) throw new Error("Etapa inválida para este quadro.");
+    if (stage.restrictToManagers && !isManager) {
+      throw new Error("Somente admin/gestão podem mover para esta etapa.");
+    }
+    if (!isManager && !isOwnCard) {
+      throw new Error("Sem permissão para mover a demanda de outra pessoa.");
+    }
+    // Responsável não muda em coluna de etapa.
+  }
 
-  // Reordenação: order = média entre antes e depois; se não existir, extremo
+  // Reordenação dentro da mesma coluna destino.
+  const columnWhere = {
+    teamId: card.teamId,
+    status: params.toStatus,
+    ...(isPersonColumn ? { responsibleId: toResponsibleId } : {}),
+  };
+
   let newOrder = card.order;
   const before = params.beforeCardId
-    ? await prisma.card.findFirst({
-        where: { id: params.beforeCardId, teamId: card.teamId, responsibleId: params.toResponsibleId, status: params.toStatus },
-      })
+    ? await prisma.card.findFirst({ where: { id: params.beforeCardId, ...columnWhere } })
     : null;
   const after = params.afterCardId
-    ? await prisma.card.findFirst({
-        where: { id: params.afterCardId, teamId: card.teamId, responsibleId: params.toResponsibleId, status: params.toStatus },
-      })
+    ? await prisma.card.findFirst({ where: { id: params.afterCardId, ...columnWhere } })
     : null;
 
   if (before && after) newOrder = (before.order + after.order) / 2;
@@ -155,12 +183,7 @@ export async function moveCard(params: {
   else if (!before && after) newOrder = after.order - 1000;
   else {
     const max = await prisma.card.aggregate({
-      where: {
-        teamId: card.teamId,
-        responsibleId: params.toResponsibleId,
-        status: params.toStatus,
-        id: { not: card.id },
-      },
+      where: { ...columnWhere, id: { not: card.id } },
       _max: { order: true },
     });
     newOrder = (max._max.order ?? 0) + 1000;
@@ -170,7 +193,7 @@ export async function moveCard(params: {
     where: { id: card.id },
     data: {
       status: params.toStatus,
-      responsibleId: params.toResponsibleId,
+      responsibleId: toResponsibleId,
       order: newOrder,
     },
   });

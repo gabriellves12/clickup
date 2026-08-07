@@ -2,10 +2,10 @@
 
 import * as React from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronLeft, ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock, MoreHorizontal, Pencil, Trash2, Unlock } from "lucide-react";
 import { useTransition } from "react";
 import { cn } from "@/lib/cn";
-import { deleteColumn, renameColumn, reorderColumn } from "@/app/actions/boards";
+import { deleteColumn, renameColumn, reorderColumn, setColumnRestriction } from "@/app/actions/boards";
 
 type Neighbor = { id: string; order: number } | null;
 
@@ -21,9 +21,11 @@ type Props = {
     next: Neighbor;
     nextNext: Neighbor;
   };
+  restrictToManagers?: boolean;
+  teamId?: string;
 };
 
-export function ColumnHeader({ id, label, count, tone, canEdit, neighbors }: Props) {
+export function ColumnHeader({ id, label, count, tone, canEdit, neighbors, restrictToManagers = false, teamId: _teamId }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(label);
   const [pending, startTransition] = useTransition();
@@ -72,9 +74,19 @@ export function ColumnHeader({ id, label, count, tone, canEdit, neighbors }: Pro
     });
   }
 
+  function toggleRestriction() {
+    startTransition(async () => {
+      try { await setColumnRestriction({ id, restrictToManagers: !restrictToManagers }); }
+      catch (err) { alert(err instanceof Error ? err.message : "Não foi possível atualizar."); }
+    });
+  }
+
   return (
     <header className="group h-11 shrink-0 px-3 flex items-center gap-2 border-b border-[#e8e8e8] bg-[#fafafa]">
       <span className={cn("size-2 rounded-full shrink-0", toneColor.dot)} aria-hidden />
+      {restrictToManagers && (
+        <Lock className="size-3 text-[#a09990]" aria-label="Somente gestão" />
+      )}
       {editing ? (
         <input
           autoFocus
@@ -136,6 +148,11 @@ export function ColumnHeader({ id, label, count, tone, canEdit, neighbors }: Pro
                 disabled={!neighbors.next}
               >
                 <ChevronRight className="size-3.5" /> Mover para direita
+              </DropdownItem>
+              <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
+              <DropdownItem onSelect={toggleRestriction}>
+                {restrictToManagers ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
+                {restrictToManagers ? "Liberar para membros" : "Restringir a gestão"}
               </DropdownItem>
               <DropdownMenu.Separator className="my-1 h-px bg-hairline" />
               <DropdownItem onSelect={handleDelete} destructive>

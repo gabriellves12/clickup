@@ -8,8 +8,9 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useTransition } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Lock } from "lucide-react";
 import { moveCard } from "@/app/actions/cards";
+import { PERSON_COLUMN_STATUS } from "@/lib/board-config";
 import { TaskCard } from "./TaskCard";
 import { EditableBoardTitle } from "./EditableBoardTitle";
 import { ColumnHeader } from "./ColumnHeader";
@@ -22,14 +23,23 @@ import { emptyFilters, matchesDate, type BoardFiltersState } from "./BoardFilter
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import { IcPlus } from "@/components/icons";
 import { cn } from "@/lib/cn";
-import type { BoardData, CardLite } from "./types";
+import type { BoardData, CardLite, PersonLite, FlowColumnDef } from "./types";
 import { CardDialog } from "@/components/dialogs/CardDialog";
 
-const cellKey = (statusKey: string, personId: string) => `cell::${statusKey}::${personId}`;
-const parseCell = (id: string) => {
-  const [, statusKey, personId] = id.split("::");
-  return { statusKey, personId };
+// ---------------- Column model ----------------
+
+type PersonColumn = { kind: "person"; id: string; label: string; person: PersonLite };
+type StageColumn  = { kind: "stage";  id: string; label: string; stage: FlowColumnDef };
+type BoardColumn  = PersonColumn | StageColumn;
+
+const dropId = (col: BoardColumn) => (col.kind === "person" ? `person::${col.person.id}` : `stage::${col.stage.key}`);
+const parseDropId = (id: string): { kind: "person" | "stage"; key: string } | null => {
+  const [kind, key] = id.split("::");
+  if (kind !== "person" && kind !== "stage") return null;
+  return { kind, key };
 };
+
+// ---------------- Component ----------------
 
 export function BoardClient({
   data, canManage, currentUserId,
@@ -63,6 +73,10 @@ export function BoardClient({
 
   const flow = React.useMemo(() => [...data.flow].sort((a, b) => a.order - b.order), [data.flow]);
   const stageMap = React.useMemo(() => new Map(flow.map((s) => [s.key, s])), [flow]);
+  const restrictedStageKeys = React.useMemo(
+    () => new Set(flow.filter((s) => s.restrictToManagers).map((s) => s.key)),
+    [flow],
+  );
 
   // ------------ Filtros ------------
   const effectivePersonIds = React.useMemo(() => {
@@ -94,7 +108,7 @@ export function BoardClient({
     return data.members;
   }, [data.members, filters.onlyMe, filters.personIds, currentUserId]);
 
-  // ------------ Materiais Pendentes (independente de filtros) ------------
+  // ------------ Materiais Pendentes (lens, independente de filtros) ------------
   const overdueOrPending = React.useMemo(() => cards
     .filter((c) => {
       if (c.status === "FINALIZADO") return false;
@@ -105,64 +119,93 @@ export function BoardClient({
     .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? "")),
   [cards, todayStart]);
 
-  // ------------ Cards por célula (etapa × pessoa) ------------
-  const cardsByCell = React.useMemo(() => {
+  // ------------ Colunas do board (flat) ------------
+  const columns: BoardColumn[] = React.useMemo(() => {
+    const personCols: PersonColumn[] = visibleMembers.map((m) => ({
+      kind: "person",
+      id: `person::${m.person.id}`,
+      label: m.person.name,
+      person: m.person,
+    }));
+    const stageCols: StageColumn[] = flow.map((s) => ({
+      kind: "stage",
+      id: `stage::${s.key}`,
+      label: s.label,
+      stage: s,
+    }));
+    return [...personCols, ...stageCols];
+  }, [visibleMembers, flow]);
+
+  // ------------ Cards por coluna ------------
+  const cardsByColumn = React.useMemo(() => {
     const map = new Map<string, CardLite[]>();
-    for (const p of visibleMembers)
-      for (const s of flow) map.set(cellKey(s.key, p.person.id), []);
+    for (const col of columns) map.set(col.id, []);
     for (const c of filteredCards) {
-      const k = cellKey(c.status, c.responsibleId);
-      if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(c);
+      const key = c.status === PERSON_COLUMN_STATUS
+        ? `person::${c.responsibleId}`
+        : `stage::${c.status}`;
+      if (map.has(key)) map.get(key)!.push(c);
     }
     for (const [, arr] of map) arr.sort((a, b) => a.order - b.order);
     return map;
-  }, [filteredCards, visibleMembers, flow]);
-
-  const countsByStatus = React.useMemo(() => {
-    const map = new Map<string, number>();
-    for (const c of filteredCards) map.set(c.status, (map.get(c.status) ?? 0) + 1);
-    return map;
-  }, [filteredCards]);
-
-  const countsByPerson = React.useMemo(() => {
-    const map = new Map<string, number>();
-    for (const c of filteredCards) map.set(c.responsibleId, (map.get(c.responsibleId) ?? 0) + 1);
-    return map;
-  }, [filteredCards]);
+  }, [filteredCards, columns]);
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) : null;
 
-  // ------------ Drag & Drop (na matriz: reordena e muda etapa, mantém pessoa) ------------
+  // ------------ Permissão de drop (client-side) ------------
+  const canDropOn = React.useCallback((source: CardLite, col: BoardColumn): boolean => {
+    const isOwn = source.responsibleId === currentUserId;
+    if (!canManage && !isOwn) return false;
+    if (col.kind === "person") {
+      if (!canManage && col.person.id !== currentUserId) return false;
+      return true;
+    }
+    if (col.stage.restrictToManagers && !canManage) return false;
+    return true;
+  }, [canManage, currentUserId]);
+
+  // ------------ Drag & Drop ------------
   function onDragStart(e: DragStartEvent) { setActiveId(String(e.active.id)); }
 
   function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
-    const activeCard = cards.find((c) => c.id === active.id);
-    if (!activeCard) return;
+    const source = cards.find((c) => c.id === active.id);
+    if (!source) return;
 
-    let toStatus = activeCard.status;
-    let toResponsibleId = activeCard.responsibleId;
+    // Descobre a coluna destino: pode vir do container (dropId) ou de um card (herda coluna do card alvo).
+    let targetCol: BoardColumn | undefined;
     let overCard: CardLite | undefined;
 
-    if (over.data.current?.type === "cell") {
-      const parsed = parseCell(String(over.id));
-      toStatus = parsed.statusKey;
-      toResponsibleId = parsed.personId;
+    if (over.data.current?.type === "column") {
+      targetCol = columns.find((c) => c.id === String(over.id));
     } else {
       overCard = cards.find((c) => c.id === over.id);
-      if (overCard) { toStatus = overCard.status; toResponsibleId = overCard.responsibleId; }
+      if (overCard) {
+        const key = overCard.status === PERSON_COLUMN_STATUS
+          ? `person::${overCard.responsibleId}`
+          : `stage::${overCard.status}`;
+        targetCol = columns.find((c) => c.id === key);
+      }
     }
+    if (!targetCol) return;
 
-    // Regra: DnD só reordena/muda etapa dentro da mesma raia (mesma pessoa).
-    if (toResponsibleId !== activeCard.responsibleId) return;
+    if (!canDropOn(source, targetCol)) return;
 
+    // Novo status/responsável conforme coluna alvo.
+    const toStatus = targetCol.kind === "person" ? PERSON_COLUMN_STATUS : targetCol.stage.key;
+    const toResponsibleId = targetCol.kind === "person" ? targetCol.person.id : source.responsibleId;
+
+    // Optimistic update.
     setCards((prev) => {
-      const withoutActive = prev.filter((c) => c.id !== activeCard.id);
+      const withoutActive = prev.filter((c) => c.id !== source.id);
       const targetList = withoutActive
-        .filter((c) => c.status === toStatus && c.responsibleId === toResponsibleId)
+        .filter((c) => (
+          targetCol!.kind === "person"
+            ? c.status === PERSON_COLUMN_STATUS && c.responsibleId === toResponsibleId
+            : c.status === targetCol!.stage.key
+        ))
         .sort((a, b) => a.order - b.order);
       const insertAt = overCard ? targetList.findIndex((c) => c.id === overCard!.id) : targetList.length;
       const before = insertAt > 0 ? targetList[insertAt - 1] : null;
@@ -172,18 +215,22 @@ export function BoardClient({
         : after ? after.order - 1000
         : 1000;
       return withoutActive.concat({
-        ...activeCard, status: toStatus, responsibleId: toResponsibleId, order: newOrder,
+        ...source, status: toStatus, responsibleId: toResponsibleId, order: newOrder,
       });
     });
 
     startTransition(async () => {
       try {
         const list = cards
-          .filter((c) => c.status === toStatus && c.responsibleId === toResponsibleId && c.id !== activeCard.id)
+          .filter((c) => (
+            targetCol!.kind === "person"
+              ? c.status === PERSON_COLUMN_STATUS && c.responsibleId === toResponsibleId
+              : c.status === targetCol!.stage.key
+          ) && c.id !== source.id)
           .sort((a, b) => a.order - b.order);
         const idx = overCard ? list.findIndex((c) => c.id === overCard!.id) : list.length;
         await moveCard({
-          cardId: activeCard.id,
+          cardId: source.id,
           toStatus,
           toResponsibleId,
           beforeCardId: idx > 0 ? list[idx - 1].id : null,
@@ -244,95 +291,52 @@ export function BoardClient({
         {view === "list" ? (
           <BoardListView cards={filteredCards} flow={flow} onOpen={setOpenCardId} />
         ) : (
-          <div className="h-full flex gap-3">
-            <PendingColumn cards={overdueOrPending} onOpen={setOpenCardId} />
+          <DndContext id="board-dnd" sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+            <div className="h-full flex gap-3 overflow-x-auto scrollbar-clean pb-2">
+              <PendingColumn cards={overdueOrPending} onOpen={setOpenCardId} />
 
-            <DndContext id="board-dnd" sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-              <section className="flex-1 min-w-0 overflow-auto scrollbar-clean rounded-lg border border-[#e7e7e7] bg-white">
-                <div className="min-w-max">
-                  {/* Header row */}
-                  <div className="sticky top-0 z-10 flex bg-[#fafafa] border-b border-[#e8e8e8]">
-                    <div className="w-[180px] shrink-0 px-4 h-11 flex items-center text-[10px] font-semibold uppercase tracking-[.06em] text-[#999] border-r border-[#eee] sticky left-0 bg-[#fafafa] z-[2]">
-                      Pessoas
-                    </div>
-                    {flow.map((col, idx) => (
-                      <div key={col.id} className="w-[260px] shrink-0 border-r border-[#eee]">
-                        <ColumnHeader
-                          id={col.id}
-                          label={col.label}
-                          count={countsByStatus.get(col.key) ?? 0}
-                          tone={col.tone}
-                          canEdit={canManage}
-                          neighbors={{
-                            prev: flow[idx - 1] ? { id: flow[idx - 1].id, order: flow[idx - 1].order } : null,
-                            prevPrev: flow[idx - 2] ? { id: flow[idx - 2].id, order: flow[idx - 2].order } : null,
-                            next: flow[idx + 1] ? { id: flow[idx + 1].id, order: flow[idx + 1].order } : null,
-                            nextNext: flow[idx + 2] ? { id: flow[idx + 2].id, order: flow[idx + 2].order } : null,
-                          }}
-                        />
-                      </div>
-                    ))}
-                    {canManage && (
-                      <div className="w-[220px] shrink-0 p-2">
-                        <AddColumnButton teamId={data.team.id} />
-                      </div>
-                    )}
-                  </div>
+              {columns.map((col) => {
+                const list = cardsByColumn.get(col.id) ?? [];
+                return (
+                  <BoardColumnView
+                    key={col.id}
+                    column={col}
+                    cards={list}
+                    stageMap={stageMap}
+                    onOpen={setOpenCardId}
+                    onAdd={canManage ? () => setCreating({
+                      open: true,
+                      status: col.kind === "stage" ? col.stage.key : PERSON_COLUMN_STATUS,
+                      responsibleId: col.kind === "person" ? col.person.id : undefined,
+                    }) : undefined}
+                    canEdit={canManage}
+                    boardTeamId={data.team.id}
+                    stageNeighbors={col.kind === "stage" ? getStageNeighbors(flow, col.stage.key) : undefined}
+                    restrictedForCurrentUser={col.kind === "stage" && restrictedStageKeys.has(col.stage.key) && !canManage}
+                  />
+                );
+              })}
 
-                  {/* Rows (uma por pessoa) */}
-                  {visibleMembers.map(({ person }) => (
-                    <div key={person.id} className="flex border-b border-[#eee] last:border-b-0">
-                      <div className="w-[180px] shrink-0 px-4 py-3 flex items-center gap-2.5 border-r border-[#eee] bg-[#fafafa] sticky left-0 z-[1]">
-                        <Avatar size="sm" initials={person.initials} colorKey={person.color} className="border-0" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[11.5px] font-semibold text-[#333] truncate">{person.name}</div>
-                          <div className="text-[9.5px] text-[#999] tabular">
-                            {countsByPerson.get(person.id) ?? 0} demandas
-                          </div>
-                        </div>
-                      </div>
-                      {flow.map((col) => {
-                        const list = cardsByCell.get(cellKey(col.key, person.id)) ?? [];
-                        return (
-                          <Cell
-                            key={col.id}
-                            statusKey={col.key}
-                            personId={person.id}
-                            cards={list}
-                            stageMap={stageMap}
-                            onOpen={setOpenCardId}
-                            onAdd={canManage ? () => setCreating({ open: true, status: col.key, responsibleId: person.id }) : undefined}
-                          />
-                        );
-                      })}
-                      {canManage && <div className="w-[220px] shrink-0" />}
-                    </div>
-                  ))}
-
-                  {visibleMembers.length === 0 && (
-                    <div className="p-10 text-center text-[11px] text-text-3">
-                      {data.members.length === 0
-                        ? "Nenhuma pessoa vinculada a este quadro ainda."
-                        : "Nenhuma raia visível para os filtros atuais."}
-                    </div>
-                  )}
+              {canManage && (
+                <div className="w-[240px] shrink-0 pt-1">
+                  <AddColumnButton teamId={data.team.id} />
                 </div>
-              </section>
+              )}
+            </div>
 
-              <DragOverlay dropAnimation={null}>
-                {activeCard ? (
-                  <div className="rotate-1">
-                    <TaskCard
-                      card={activeCard}
-                      stageLabel={stageMap.get(activeCard.status)?.label}
-                      stageTone={stageMap.get(activeCard.status)?.tone}
-                      onOpen={() => {}}
-                    />
-                  </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          </div>
+            <DragOverlay dropAnimation={null}>
+              {activeCard ? (
+                <div className="rotate-1">
+                  <TaskCard
+                    card={activeCard}
+                    stageLabel={stageMap.get(activeCard.status)?.label}
+                    stageTone={stageMap.get(activeCard.status)?.tone}
+                    onOpen={() => {}}
+                  />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
 
@@ -357,61 +361,115 @@ export function BoardClient({
   );
 }
 
-/* ------------------------- Cell (dropzone da matriz) ------------------------- */
+/* ------------------------- Board column ------------------------- */
 
-function Cell({
-  statusKey, personId, cards, stageMap, onOpen, onAdd,
+function BoardColumnView({
+  column, cards, stageMap, onOpen, onAdd, canEdit, boardTeamId, stageNeighbors, restrictedForCurrentUser,
 }: {
-  statusKey: string;
-  personId: string;
+  column: BoardColumn;
   cards: CardLite[];
-  stageMap: Map<string, { label: string; tone: string | null }>;
+  stageMap: Map<string, FlowColumnDef>;
   onOpen: (id: string) => void;
   onAdd?: () => void;
+  canEdit: boolean;
+  boardTeamId: string;
+  stageNeighbors?: ReturnType<typeof getStageNeighbors>;
+  restrictedForCurrentUser: boolean;
 }) {
-  const id = cellKey(statusKey, personId);
-  const { setNodeRef, isOver } = useDroppable({ id, data: { type: "cell" } });
+  const id = dropId(column);
+  const { setNodeRef, isOver } = useDroppable({ id, data: { type: "column" } });
   const items = React.useMemo(() => cards.map((c) => c.id), [cards]);
 
   return (
-    <div
-      ref={setNodeRef}
+    <section
       className={cn(
-        "w-[260px] shrink-0 border-r border-[#eee] p-2 min-h-[140px] grid gap-1.5 content-start",
-        "transition-colors duration-100",
-        isOver && "bg-accent/6 outline outline-1 outline-accent/40 outline-offset-[-1px]",
+        "w-[268px] shrink-0 bg-white border border-[#e7e7e7] rounded-lg overflow-hidden flex flex-col transition-colors duration-100",
+        isOver && !restrictedForCurrentUser && "outline outline-1 outline-accent/50 outline-offset-[-1px] bg-accent/5",
+        restrictedForCurrentUser && "opacity-85",
       )}
     >
-      <SortableContext items={items} strategy={verticalListSortingStrategy}>
-        {cards.map((c) => (
-          <TaskCard
-            key={c.id}
-            card={c}
-            isDone={c.status === "FINALIZADO"}
-            stageLabel={stageMap.get(c.status)?.label}
-            stageTone={stageMap.get(c.status)?.tone}
-            onOpen={onOpen}
-          />
-        ))}
-      </SortableContext>
-      {onAdd && (
+      {column.kind === "person" ? (
+        <PersonColumnHeader person={column.person} count={cards.length} />
+      ) : (
+        <ColumnHeader
+          id={column.stage.id}
+          label={column.stage.label}
+          count={cards.length}
+          tone={column.stage.tone}
+          canEdit={canEdit}
+          neighbors={stageNeighbors ?? { prev: null, prevPrev: null, next: null, nextNext: null }}
+          restrictToManagers={column.stage.restrictToManagers}
+          teamId={boardTeamId}
+        />
+      )}
+
+      <div ref={setNodeRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-clean grid gap-2 p-2 content-start">
+        <SortableContext items={items} strategy={verticalListSortingStrategy}>
+          {cards.map((c) => (
+            <TaskCard
+              key={c.id}
+              card={c}
+              isDone={c.status === "FINALIZADO"}
+              stageLabel={stageMap.get(c.status)?.label}
+              stageTone={stageMap.get(c.status)?.tone}
+              onOpen={onOpen}
+            />
+          ))}
+        </SortableContext>
+        {cards.length === 0 && (
+          <div className="text-[10.5px] text-[#a5a5a5] border border-dashed border-[#eaeaea] rounded-md p-4 text-center">
+            {restrictedForCurrentUser ? (
+              <span className="inline-flex items-center gap-1"><Lock className="size-3" /> Somente gestão</span>
+            ) : (
+              <span>Sem tarefas</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {onAdd && !restrictedForCurrentUser && (
         <button
           type="button"
           onClick={onAdd}
-          className="h-8 rounded-md text-left px-2 text-[10.5px] text-[#999] hover:text-[#333] hover:bg-[#f3f3f3] transition-colors"
+          className="h-8 text-left px-3 text-[10.5px] text-[#888] hover:text-[#222] hover:bg-[#f5f5f5] border-t border-[#f0f0f0] transition-colors"
         >
-          + Adicionar
+          + Adicionar tarefa
         </button>
       )}
-    </div>
+    </section>
   );
 }
 
-/* ------------------------- Pending column ------------------------- */
+function PersonColumnHeader({ person, count }: { person: PersonLite; count: number }) {
+  return (
+    <header className="h-11 shrink-0 px-3 flex items-center gap-2 border-b border-[#e8e8e8] bg-[#fafafa]">
+      <Avatar size="sm" initials={person.initials} colorKey={person.color} className="border-0" />
+      <span className="text-[10.5px] font-semibold uppercase tracking-[.055em] text-[#333] truncate flex-1">
+        {person.name}
+      </span>
+      <span className="min-w-5 h-5 px-1.5 rounded bg-[#e9e9e9] grid place-items-center text-[9.5px] tabular text-[#666]">
+        {count}
+      </span>
+    </header>
+  );
+}
+
+function getStageNeighbors(flow: FlowColumnDef[], key: string) {
+  const idx = flow.findIndex((s) => s.key === key);
+  const at = (n: number) => (flow[n] ? { id: flow[n].id, order: flow[n].order } : null);
+  return {
+    prev: at(idx - 1),
+    prevPrev: at(idx - 2),
+    next: at(idx + 1),
+    nextNext: at(idx + 2),
+  };
+}
+
+/* ------------------------- Pending column (lens) ------------------------- */
 
 function PendingColumn({ cards, onOpen }: { cards: CardLite[]; onOpen: (id: string) => void }) {
   return (
-    <div className="w-[268px] shrink-0 bg-white border border-[#e7e7e7] rounded-lg overflow-hidden flex flex-col">
+    <section className="w-[268px] shrink-0 bg-white border border-[#e7e7e7] rounded-lg overflow-hidden flex flex-col">
       <header
         className="px-3 py-2.5 flex items-center gap-2 text-white shrink-0"
         style={{ background: "var(--danger-strong)" }}
@@ -449,7 +507,7 @@ function PendingColumn({ cards, onOpen }: { cards: CardLite[]; onOpen: (id: stri
           </button>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

@@ -37,6 +37,7 @@ model TeamStatus {
   label     String
   order     Float    @default(1000)
   tone      String?  // neutral | info | doing | review | done | warn
+  restrictToManagers Boolean @default(false) // se true, só admin/manager podem mover cards para esta etapa
   createdAt DateTime @default(now())
 
   team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -53,6 +54,8 @@ model Person {
   color     String   @default("av-1") // token de gradiente do DS: av-1..av-5
   role      String   @default("member") // admin | manager | member | client
   clientId  String?
+  accessEnabled Boolean @default(true)
+  avatarUrl String?
   createdAt DateTime @default(now())
 
   teams  TeamMember[]

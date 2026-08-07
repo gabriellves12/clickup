@@ -10,7 +10,7 @@ import { createOrUpdateCard, deleteCard } from "@/app/actions/cards";
 import { createClientQuick, createProductQuick } from "@/app/actions/catalog";
 import { cn } from "@/lib/cn";
 import type { CardLite, ClientWithLinks, DemandTypeLite, PersonLite, ProductLite } from "@/components/board/types";
-import type { StatusDef } from "@/lib/board-config";
+import { PERSON_COLUMN_STATUS, type StatusDef } from "@/lib/board-config";
 
 type Props = {
   open: boolean;
@@ -65,7 +65,7 @@ export function CardDialog({
     externalMaterials: editing?.externalMaterials ?? "",
     useExternalMaterials: editing?.useExternalMaterials ?? false,
     responsibleId: editing?.responsibleId ?? defaults?.responsibleId ?? people[0]?.id ?? "",
-    status: editing?.status ?? defaults?.status ?? flow[0]?.key ?? "EM_PRODUCAO",
+    status: editing?.status ?? defaults?.status ?? PERSON_COLUMN_STATUS,
     startDate: editing?.startDate?.slice(0, 10) ?? "",
     deadline: editing?.deadline?.slice(0, 10) ?? "",
     priority: editing?.priority ?? "NORMAL",
@@ -173,7 +173,7 @@ export function CardDialog({
               {editing && <div className="bg-white px-2 sm:px-4">
                 <Input value={form.title} onChange={(event) => { set("title", event.target.value); setTitleWasEdited(true); }} className="h-auto w-full border-0 px-0 py-2 text-[22px] font-semibold tracking-[-.025em] shadow-none focus:ring-0" />
                 <div className="mt-4 grid sm:grid-cols-2 gap-x-10 gap-y-3 border-b border-[#e8e8e8] pb-6">
-                  <MetaField label="Status"><Select value={form.status} onChange={(event) => set("status", event.target.value)}>{destFlow.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</Select></MetaField>
+                  <MetaField label="Status"><Select value={form.status} onChange={(event) => set("status", event.target.value)}><option value={PERSON_COLUMN_STATUS}>Coluna da pessoa</option>{destFlow.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</Select></MetaField>
                   <MetaField label="Responsável"><Select value={form.responsibleId} onChange={(event) => set("responsibleId", event.target.value)}>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</Select></MetaField>
                   <MetaField label="Datas"><div className="grid grid-cols-2 gap-2"><Input type="date" value={form.startDate} onChange={(event) => set("startDate", event.target.value)} /><Input type="date" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} /></div></MetaField>
                   <MetaField label="Prioridade"><Select value={form.priority} onChange={(event) => set("priority", event.target.value)}>{priorities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select></MetaField>

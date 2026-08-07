@@ -1,0 +1,2 @@
+ALTER TABLE "Person" ADD COLUMN "accessEnabled" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "Person" ADD COLUMN "avatarUrl" TEXT;

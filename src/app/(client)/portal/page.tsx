@@ -30,7 +30,7 @@ export default async function ClientPortalPage() {
       <span className="mx-4 hidden h-5 w-px bg-[#e5e5e5] sm:block" />
       <span className="hidden text-[11px] text-[#777] sm:block">Portal do cliente</span>
       <NotificationCenter overdueCount={overdueCount} pendingMaterialCount={pendingMaterialCount} variant="client" />
-      <ClientAccountMenu name={user.name} email={user.email} clientName={client.name} />
+      <ClientAccountMenu name={user.name} email={user.email} clientName={client.name} avatarUrl={user.avatarUrl} />
     </header>
 
     <section className="border-b border-[#e8e8e8] bg-white px-5 py-7 sm:px-8">
