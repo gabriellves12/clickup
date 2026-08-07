@@ -1,9 +1,9 @@
 import Image from "next/image";
-import { LogOut, UserRound } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/current-user";
-import { signOut } from "@/app/actions/auth";
 import { ClientBoard } from "@/components/client/ClientBoard";
+import { ClientAccountMenu } from "@/components/client/ClientAccountMenu";
+import { NotificationCenter } from "@/components/shell/NotificationCenter";
 
 const statusOrder = ["PENDENTES", "PARA_PRODUCAO", "EM_PRODUCAO", "APROVACAO", "FINALIZADO"];
 const statusLabels: Record<string, string> = {
@@ -19,13 +19,18 @@ export default async function ClientPortalPage() {
   });
   if (!client) return null;
 
+  const today = new Date();
+  const overdueCount = client.cards.filter((card) => card.clientStatus !== "FINALIZADO" && card.deadline && card.deadline < today).length;
+  const pendingMaterialCount = client.cards.filter((card) => card.clientStatus === "APROVACAO").length;
+
 
   return <main className="flex min-h-dvh flex-col bg-[#f7f7f7] text-[#191919]">
     <header className="flex h-16 items-center border-b border-[#e5e5e5] bg-white px-5 sm:px-8">
       <Image src="/control-wordmark.svg" alt="Thinkcontrol" width={132} height={30} className="h-7 w-auto" priority />
       <span className="mx-4 hidden h-5 w-px bg-[#e5e5e5] sm:block" />
       <span className="hidden text-[11px] text-[#777] sm:block">Portal do cliente</span>
-      <div className="ml-auto flex items-center gap-3"><span className="hidden text-right sm:block"><b className="block text-[10.5px] font-medium">{user.name}</b><small className="text-[9px] text-[#999]">{client.name}</small></span><span className="grid size-8 place-items-center rounded-full bg-[#171717] text-white"><UserRound className="size-3.5" /></span><form action={signOut}><button type="submit" aria-label="Sair" className="grid size-8 place-items-center rounded-md text-[#777] hover:bg-[#f1f1f1] hover:text-[#222]"><LogOut className="size-3.5" /></button></form></div>
+      <NotificationCenter overdueCount={overdueCount} pendingMaterialCount={pendingMaterialCount} variant="client" />
+      <ClientAccountMenu name={user.name} email={user.email} clientName={client.name} />
     </header>
 
     <section className="border-b border-[#e8e8e8] bg-white px-5 py-7 sm:px-8">

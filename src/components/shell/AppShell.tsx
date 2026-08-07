@@ -15,6 +15,7 @@ import { Avatar } from "@/components/ui/primitives";
 import type { CurrentUser } from "@/lib/current-user";
 import { signOut } from "@/app/actions/auth";
 import { CreateBoardDialog } from "@/components/dialogs/CreateBoardDialog";
+import { NotificationCenter } from "@/components/shell/NotificationCenter";
 
 export type BoardMenuItem = {
   slug: string;
@@ -29,6 +30,8 @@ type Props = {
   boards: BoardMenuItem[];
   canEditBoards: boolean;
   clients: { id: string; name: string }[];
+  overdueCount: number;
+  pendingMaterialCount: number;
   children: React.ReactNode;
 };
 
@@ -37,7 +40,7 @@ const iconMap = {
   crm: ContactRound, drive: FolderUp, dashboard: BarChart3, admin: ShieldCheck,
 } satisfies Record<NavigationIcon, React.ComponentType<{ className?: string; strokeWidth?: number }>>;
 
-export function AppShell({ user, boards, canEditBoards, clients, children }: Props) {
+export function AppShell({ user, boards, canEditBoards, clients, overdueCount, pendingMaterialCount, children }: Props) {
   const path = usePathname();
   const router = useRouter();
   const [collapsed, setCollapsed] = React.useState(false);
@@ -169,7 +172,7 @@ export function AppShell({ user, boards, canEditBoards, clients, children }: Pro
       </aside>
 
       <section className="min-w-0 flex-1 h-full flex flex-col bg-white">
-        <TopBar path={path} collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
+        <TopBar path={path} collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} overdueCount={overdueCount} pendingMaterialCount={pendingMaterialCount} />
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
       </section>
 
@@ -333,7 +336,7 @@ function BoardDropdown({
 
 /* ------------------------- TopBar ------------------------- */
 
-function TopBar({ path, collapsed, onToggle }: { path: string; collapsed: boolean; onToggle: () => void }) {
+function TopBar({ path, collapsed, onToggle, overdueCount, pendingMaterialCount }: { path: string; collapsed: boolean; onToggle: () => void; overdueCount: number; pendingMaterialCount: number }) {
   const current = navigationItems.find((item) => (item.matchPrefixes ?? [item.href]).some((prefix) => path === prefix || path.startsWith(`${prefix}/`)));
   const currentLabel = path === "/configuracoes" ? "Configurações" : current?.label ?? "Visão geral";
   return (
@@ -347,6 +350,7 @@ function TopBar({ path, collapsed, onToggle }: { path: string; collapsed: boolea
         <span className="text-[#bbb]">/</span>
         <b className="font-medium text-[#222]">{currentLabel}</b>
       </div>
+      <div className="ml-auto"><NotificationCenter overdueCount={overdueCount} pendingMaterialCount={pendingMaterialCount} /></div>
     </header>
   );
 }

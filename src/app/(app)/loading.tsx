@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 // Fallback global das rotas autenticadas. Aparece imediatamente ao clicar num
 // link, antes do RSC/dados chegarem — dá feedback visual instantâneo mesmo
 // quando o layout está aquecendo o pool.
@@ -10,7 +12,7 @@ export default function AppLoading() {
         aria-live="polite"
         role="status"
       >
-        <img src="/control-wordmark.svg" alt="" width={140} height={32} className="h-8 w-auto" />
+        <Image src="/control-wordmark.svg" alt="" width={140} height={32} className="h-8 w-auto" priority />
         <span className="sr-only">Carregando…</span>
       </div>
     </div>

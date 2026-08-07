@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CalendarDays, Circle, ExternalLink, PanelsTopLeft, UserPlus, UsersRound } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/current-user";
@@ -13,7 +14,7 @@ const statusLabels: Record<string, string> = {
 
 export default async function ClientAreaPreviewPage({ searchParams }: { searchParams: Promise<{ cliente?: string }> }) {
   const user = await requireCurrentUser();
-  if (user.role !== "admin" && user.role !== "manager") return null;
+  if (user.role !== "admin" && user.role !== "manager") redirect("/kanban");
   const { cliente } = await searchParams;
   const clients = await prisma.client.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, name: true, initials: true, status: true } });
   const selectedId = clients.some((client) => client.id === cliente) ? cliente! : clients[0]?.id;

@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
-// Middleware — só faz refresh de sessão Supabase quando há cookie de sessão presente
+// Proxy — só faz refresh de sessão Supabase quando há cookie de sessão presente
 // e a rota está dentro do app autenticado. Rotas públicas (login, definir senha,
 // static) passam direto — evita hop desnecessário pro Supabase.
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rotas públicas — nunca precisam de refresh de sessão.

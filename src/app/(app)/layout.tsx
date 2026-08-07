@@ -10,7 +10,7 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
 
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
 
-  const [teams, totalByTeam, overdueByTeam, clientsForDialog] = await Promise.all([
+  const [teams, totalByTeam, overdueByTeam, lateByTeam, pendingMaterialByTeam, clientsForDialog] = await Promise.all([
     prisma.team.findMany({
       orderBy: [{ kind: "asc" }, { order: "asc" }],
       select: { id: true, slug: true, name: true, kind: true, clientId: true },
@@ -24,6 +24,16 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       },
       _count: { _all: true },
     }),
+    prisma.card.groupBy({
+      by: ["teamId"],
+      where: { status: { not: "FINALIZADO" }, deadline: { lt: todayStart } },
+      _count: { _all: true },
+    }),
+    prisma.card.groupBy({
+      by: ["teamId"],
+      where: { status: { not: "FINALIZADO" }, pendenteMaterial: true },
+      _count: { _all: true },
+    }),
     prisma.client.findMany({
       where: { status: "ATIVO" },
       orderBy: { name: "asc" },
@@ -33,6 +43,8 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
 
   const totalMap = new Map(totalByTeam.map((row) => [row.teamId, row._count._all]));
   const overdueMap = new Map(overdueByTeam.map((row) => [row.teamId, row._count._all]));
+  const overdueCount = lateByTeam.reduce((total, row) => total + row._count._all, 0);
+  const pendingMaterialCount = pendingMaterialByTeam.reduce((total, row) => total + row._count._all, 0);
 
   const boards: BoardMenuItem[] = teams.map((team) => ({
     slug: team.slug,
@@ -50,6 +62,8 @@ export default async function AuthenticatedLayout({ children }: { children: Reac
       boards={boards}
       canEditBoards={canEditBoards}
       clients={clientsForDialog}
+      overdueCount={overdueCount}
+      pendingMaterialCount={pendingMaterialCount}
     >
       {children}
     </AppShell>

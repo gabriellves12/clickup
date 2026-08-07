@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { GlobalSplash } from "@/components/shell/GlobalSplash";
 import "./globals.css";
 
@@ -9,13 +8,9 @@ export const metadata: Metadata = {
   icons: { icon: "/control-icon.svg" },
 };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const cookieStore = await cookies();
-  const cookieTheme = cookieStore.get("theme")?.value;
-  const dataTheme = cookieTheme === "dark" || cookieTheme === "light" ? cookieTheme : undefined;
-
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" data-theme={dataTheme} suppressHydrationWarning>
+    <html lang="pt-BR">
       <head>
         <link
           rel="preload"

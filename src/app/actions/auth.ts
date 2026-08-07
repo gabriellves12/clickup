@@ -30,9 +30,12 @@ export async function signIn(_prev: SignInResult | null, formData: FormData): Pr
 
   // Cruza com Person para decidir destino conforme o papel.
   const person = await prisma.person.findUnique({ where: { email } });
-  const role = person?.role ?? "member";
+  if (!person) {
+    await supabase.auth.signOut();
+    return { ok: false, error: "Acesso ainda não liberado para este usuário." };
+  }
 
-  redirect(role === "client" ? "/portal" : "/inicio");
+  redirect(person.role === "client" ? "/portal" : "/inicio");
 }
 
 export async function signOut() {
