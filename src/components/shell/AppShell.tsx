@@ -210,7 +210,15 @@ function NavGroup({
     <nav className="grid gap-px">
       {items.map((item) => {
         const Icon = iconMap[item.icon];
-        const active = (item.matchPrefixes ?? [item.href]).some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+        const rawActive = (item.matchPrefixes ?? [item.href]).some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+        // Kanban e Área do cliente compartilham prefixo "/board". Desambigua pelo kind do slug ativo.
+        const isBoardRoute = path.startsWith("/board/");
+        const isKanbanItem = item.icon === "kanban";
+        const isClientAreaItem = item.icon === "clientArea";
+        const currentIsClientBoard = clientBoards.some((b) => b.slug === activeSlug);
+        const active = rawActive
+          && !(isBoardRoute && isKanbanItem && currentIsClientBoard)
+          && !(isBoardRoute && isClientAreaItem && !currentIsClientBoard);
         const content = (
           <>
             <span className={cn("size-6 shrink-0 rounded-md border grid place-items-center transition-colors", active ? "bg-[#1a1a1a] border-[#1a1a1a] text-white" : "bg-white border-[#e4e4e4] text-[#666]")}>
@@ -222,14 +230,13 @@ function NavGroup({
 
         // Kanban → dropdown com boards TEAM
         if (item.icon === "kanban" && !collapsed) {
-          const isKanbanActive = active && teamBoards.some((b) => b.slug === activeSlug);
           return (
             <div key={item.href}>
               <button
                 type="button"
                 onClick={onToggleKanban}
                 aria-expanded={kanbanOpen}
-                className={cn("w-full h-9 rounded-md flex items-center px-2 gap-2 text-[11.5px] font-medium transition-colors hover:bg-[#eeeeee]", isKanbanActive ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}
+                className={cn("w-full h-9 rounded-md flex items-center px-2 gap-2 text-[11.5px] font-medium transition-colors hover:bg-[#eeeeee]", active ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}
               >
                 {content}
                 <ChevronDown className={cn("size-3 ml-auto text-[#999] transition-transform", kanbanOpen && "rotate-180")} />
@@ -248,14 +255,13 @@ function NavGroup({
 
         // Área do cliente → dropdown com boards CLIENT
         if (item.icon === "clientArea" && !collapsed) {
-          const isClientAreaActive = active && clientBoards.some((b) => b.slug === activeSlug);
           return (
             <div key={item.href}>
               <button
                 type="button"
                 onClick={onToggleClientArea}
                 aria-expanded={clientAreaOpen}
-                className={cn("w-full h-9 rounded-md flex items-center px-2 gap-2 text-[11.5px] font-medium transition-colors hover:bg-[#eeeeee]", isClientAreaActive ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}
+                className={cn("w-full h-9 rounded-md flex items-center px-2 gap-2 text-[11.5px] font-medium transition-colors hover:bg-[#eeeeee]", active ? "text-[#171717]" : "text-[#666] hover:text-[#171717]")}
               >
                 {content}
                 <ChevronDown className={cn("size-3 ml-auto text-[#999] transition-transform", clientAreaOpen && "rotate-180")} />
