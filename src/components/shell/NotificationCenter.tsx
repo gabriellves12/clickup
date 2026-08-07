@@ -59,7 +59,10 @@ export function NotificationCenter({ overdueCount, pendingMaterialCount, variant
         <Bell className="size-3.5" strokeWidth={1.8} />
         <span className="hidden text-[10.5px] font-medium sm:inline">Central</span>
         {attentionCount > 0 && (
-          <span className="grid size-4 place-items-center rounded-full bg-[#1a1a1a] text-[8px] font-semibold tabular text-white">
+          <span
+            className="grid size-4 place-items-center rounded-full text-[8px] font-semibold tabular text-white"
+            style={{ background: "var(--danger-strong)" }}
+          >
             {attentionCount > 9 ? "9+" : attentionCount}
           </span>
         )}
@@ -117,8 +120,8 @@ function TabButton({ active, count, onClick, children }: { active: boolean; coun
 }
 
 function NotificationItem({ icon: Icon, title, description, tone = "neutral" }: { icon: typeof Bell; title: string; description: string; tone?: "neutral" | "urgent" }) {
-  return <article className={cn("flex gap-3 rounded-lg border p-3", tone === "urgent" ? "border-[#d8d8d8] bg-[#fafafa]" : "border-[#e7e7e7] bg-white")}>
-    <span className={cn("mt-0.5 grid size-7 shrink-0 place-items-center rounded-md", tone === "urgent" ? "bg-[#1d1d1d] text-white" : "bg-[#f0f0f0] text-[#555]")}><Icon className="size-3.5" strokeWidth={1.8} /></span>
+  return <article className={cn("flex gap-3 rounded-lg border p-3", tone === "urgent" ? "border-[color:var(--danger-strong)]/30 bg-[color:var(--danger-strong)]/[.05]" : "border-[#e7e7e7] bg-white")}>
+    <span className={cn("mt-0.5 grid size-7 shrink-0 place-items-center rounded-md text-white", tone === "urgent" ? "" : "bg-[#f0f0f0] !text-[#555]")} style={tone === "urgent" ? { background: "var(--danger-strong)" } : undefined}><Icon className="size-3.5" strokeWidth={1.8} /></span>
     <div className="min-w-0"><h3 className="text-[11px] font-medium leading-4 text-[#252525]">{title}</h3><p className="mt-1 text-[9.5px] leading-4 text-[#888]">{description}</p></div>
   </article>;
 }

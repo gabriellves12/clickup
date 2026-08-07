@@ -41,10 +41,12 @@ type Props = {
   matchedCount: number;
   totalCount: number;
   currentUserIsResponsible: boolean;
+  /** Quando true, layout compacto para uso dentro de popover (sem borda inferior, sem padding lateral extra). */
+  embedded?: boolean;
 };
 
 export function BoardFilters({
-  filters, onChange, people, flow, matchedCount, totalCount, currentUserIsResponsible,
+  filters, onChange, people, flow, matchedCount, totalCount, currentUserIsResponsible, embedded,
 }: Props) {
   const set = <K extends keyof BoardFiltersState>(key: K, value: BoardFiltersState[K]) =>
     onChange({ ...filters, [key]: value });
@@ -58,7 +60,10 @@ export function BoardFilters({
   const dateLabel = filters.date === "all" ? "Data" : DATE_LABELS[filters.date];
 
   return (
-    <div className="px-6 py-2.5 flex flex-wrap items-center gap-2 border-b border-[#f2f2f2] bg-[#fafafa]">
+    <div className={cn(
+      "flex flex-wrap items-center gap-2",
+      embedded ? "px-4 py-3 bg-surface" : "px-6 py-2.5 border-b border-[#f2f2f2] bg-[#fafafa]",
+    )}>
       {/* Somente eu */}
       <button
         type="button"

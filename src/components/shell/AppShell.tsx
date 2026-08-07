@@ -313,6 +313,15 @@ function BoardDropdown({
           >
             <FolderKanban className="size-3" />
             <span className="truncate">{board.name.replace(/^Time /, "")}</span>
+            {board.overdueCount > 0 && (
+              <span
+                title={`${board.overdueCount} pendentes`}
+                className="grid place-items-center min-w-[14px] h-[14px] px-1 rounded-full text-[8.5px] font-semibold tabular text-white"
+                style={{ background: "var(--danger-strong)" }}
+              >
+                {board.overdueCount > 9 ? "9+" : board.overdueCount}
+              </span>
+            )}
             <span className="ml-auto mr-1 text-[9px] tabular text-[#999]">{board.cardsCount}</span>
           </Link>
         );

@@ -48,6 +48,8 @@
   --warning: #737373;
   --danger:  #525252;
   --info:    #404040;
+  /* Vermelho de alerta visual: atrasos, notificações urgentes, materiais pendentes */
+  --danger-strong: #FF0044;
   --accent:      #0C0C0C;
   --accent-2:    #27272a;
   --accent-fg:   #FFFFFF;
@@ -93,6 +95,7 @@
   --color-success:        var(--success);
   --color-warning:        var(--warning);
   --color-danger:         var(--danger);
+  --color-danger-strong:  var(--danger-strong);
   --color-info:           var(--info);
 
   --radius-xs: 4px;
