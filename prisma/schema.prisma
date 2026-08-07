@@ -62,8 +62,21 @@ model Person {
   cards  Card[]
   client Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
   comments Comment[]
+  driveConnection GoogleDriveConnection?
 
   @@index([clientId])
+}
+
+model GoogleDriveConnection {
+  id                    String   @id @default(cuid())
+  personId              String   @unique
+  googleEmail           String
+  encryptedRefreshToken String   @db.Text
+  scopes                String?
+  connectedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade)
 }
 
 // Muitos-para-muitos com ordenação da raia por time
