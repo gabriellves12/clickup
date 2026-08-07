@@ -7,13 +7,14 @@ import { Avatar } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 import type { FlowColumnDef, PersonLite } from "./types";
 
-export type DatePreset = "all" | "today" | "week" | "month" | "overdue" | "no-deadline";
+// Valores especiais + ISO "YYYY-MM-DD" para dia específico.
+export type DateFilter = "all" | "overdue" | "no-deadline" | string;
 
 export type BoardFiltersState = {
   onlyMe: boolean;
   personIds: string[];  // vazio = todos
   statusKeys: string[]; // vazio = todos
-  date: DatePreset;
+  date: DateFilter;
 };
 
 export const emptyFilters: BoardFiltersState = {
@@ -24,14 +25,20 @@ export function hasAnyFilter(f: BoardFiltersState): boolean {
   return f.onlyMe || f.personIds.length > 0 || f.statusKeys.length > 0 || f.date !== "all";
 }
 
-const DATE_LABELS: Record<DatePreset, string> = {
-  all: "Data",
-  today: "Hoje",
-  week: "Esta semana",
-  month: "Este mês",
-  overdue: "Atrasadas",
-  "no-deadline": "Sem prazo",
-};
+function isIsoDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function dateFilterLabel(value: DateFilter): string {
+  if (value === "all") return "Data";
+  if (value === "overdue") return "Atrasadas";
+  if (value === "no-deadline") return "Sem prazo";
+  if (isIsoDate(value)) {
+    const d = new Date(`${value}T00:00:00`);
+    return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  }
+  return "Data";
+}
 
 type Props = {
   filters: BoardFiltersState;
@@ -57,7 +64,8 @@ export function BoardFilters({
     filters.statusKeys.includes(key) ? filters.statusKeys.filter((x) => x !== key) : [...filters.statusKeys, key]);
 
   const isDirty = hasAnyFilter(filters);
-  const dateLabel = filters.date === "all" ? "Data" : DATE_LABELS[filters.date];
+  const dateLabel = dateFilterLabel(filters.date);
+  const specificDate = isIsoDate(filters.date) ? filters.date : "";
 
   return (
     <div className={cn(
@@ -125,19 +133,35 @@ export function BoardFilters({
         {filters.statusKeys.length > 0 && <ClearRow onClick={() => set("statusKeys", [])} />}
       </FilterDropdown>
 
-      {/* Data */}
+      {/* Data — calendário + toggles */}
       <FilterDropdown
         label={dateLabel}
         icon={<Calendar className="size-3.5" />}
         active={filters.date !== "all"}
+        contentClassName="w-[240px] p-2 grid gap-1.5"
       >
-        {(["all", "today", "week", "month", "overdue", "no-deadline"] as DatePreset[]).map((preset) => (
-          <FilterItem key={preset} onSelect={() => set("date", preset)} checked={filters.date === preset}>
-            <span className="text-[11.5px] text-text">
-              {preset === "all" ? "Qualquer data" : DATE_LABELS[preset]}
-            </span>
-          </FilterItem>
-        ))}
+        <label className="grid gap-1 px-1 pt-1">
+          <span className="text-[9.5px] font-medium uppercase tracking-[.08em] text-text-3">Dia específico</span>
+          <input
+            type="date"
+            value={specificDate}
+            onChange={(event) => {
+              const v = event.target.value;
+              set("date", v ? v : "all");
+            }}
+            className="h-8 rounded-md border border-[#e0e0e0] bg-white px-2 text-[11px] text-text focus:border-accent focus:outline-none"
+          />
+        </label>
+        <div className="border-t border-hairline my-1" />
+        <FilterItem onSelect={() => set("date", "all")} checked={filters.date === "all"}>
+          <span className="text-[11.5px] text-text">Qualquer data</span>
+        </FilterItem>
+        <FilterItem onSelect={() => set("date", "overdue")} checked={filters.date === "overdue"}>
+          <span className="text-[11.5px] text-text">Atrasadas</span>
+        </FilterItem>
+        <FilterItem onSelect={() => set("date", "no-deadline")} checked={filters.date === "no-deadline"}>
+          <span className="text-[11.5px] text-text">Sem prazo</span>
+        </FilterItem>
       </FilterDropdown>
 
       {/* Contador + limpar */}
@@ -162,8 +186,8 @@ export function BoardFilters({
 /* ------------------------- pieces ------------------------- */
 
 function FilterDropdown({
-  label, icon, active, children,
-}: { label: string; icon?: React.ReactNode; active: boolean; children: React.ReactNode }) {
+  label, icon, active, children, contentClassName,
+}: { label: string; icon?: React.ReactNode; active: boolean; children: React.ReactNode; contentClassName?: string }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
@@ -185,7 +209,10 @@ function FilterDropdown({
         <DropdownMenu.Content
           align="start"
           sideOffset={4}
-          className="z-50 w-[220px] rounded-md border border-border bg-surface p-1 shadow-e3"
+          className={cn(
+            "z-50 rounded-md border border-border bg-surface p-1 shadow-e3",
+            contentClassName ?? "w-[220px]",
+          )}
           style={{ animation: "contentShow 140ms cubic-bezier(.2,0,0,1)" }}
         >
           {children}
@@ -245,20 +272,15 @@ export function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export function matchesDate(deadline: string | null, preset: DatePreset, today: Date): boolean {
-  if (preset === "all") return true;
-  if (preset === "no-deadline") return !deadline;
+export function matchesDate(deadline: string | null, filter: DateFilter, today: Date): boolean {
+  if (filter === "all") return true;
+  if (filter === "no-deadline") return !deadline;
   if (!deadline) return false;
   const d = new Date(deadline);
-  if (preset === "today") return isSameDay(d, today);
-  if (preset === "overdue") return d < today;
-  if (preset === "week") {
-    const start = new Date(today); start.setDate(today.getDate() - today.getDay());
-    const end = new Date(start); end.setDate(start.getDate() + 7);
-    return d >= start && d < end;
-  }
-  if (preset === "month") {
-    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
+  if (filter === "overdue") return d < today;
+  if (isIsoDate(filter)) {
+    const target = new Date(`${filter}T00:00:00`);
+    return isSameDay(d, target);
   }
   return true;
 }

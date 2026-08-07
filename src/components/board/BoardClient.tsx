@@ -8,7 +8,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useTransition } from "react";
-import { AlertTriangle, Lock } from "lucide-react";
+import { AlertTriangle, Lock, Search, X } from "lucide-react";
 import { moveCard } from "@/app/actions/cards";
 import { PERSON_COLUMN_STATUS } from "@/lib/board-config";
 import { TaskCard } from "./TaskCard";
@@ -18,7 +18,6 @@ import { AddColumnButton } from "./AddColumnButton";
 import { BoardListView } from "./BoardListView";
 import { ViewSwitcher, type BoardView } from "./ViewSwitcher";
 import { FiltersPopover } from "./FiltersPopover";
-import { StageManager } from "./StageManager";
 import { emptyFilters, matchesDate, type BoardFiltersState } from "./BoardFilters";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import { IcPlus } from "@/components/icons";
@@ -49,6 +48,7 @@ export function BoardClient({
 
   const [view, setView] = React.useState<BoardView>("board");
   const [filters, setFilters] = React.useState<BoardFiltersState>(emptyFilters);
+  const [search, setSearch] = React.useState("");
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [openCardId, setOpenCardId] = React.useState<string | null>(null);
   const [creating, setCreating] = React.useState<
@@ -89,12 +89,18 @@ export function BoardClient({
     filters.statusKeys.length ? new Set(filters.statusKeys) : null
   ), [filters.statusKeys]);
 
+  const searchQuery = React.useMemo(() => search.trim().toLocaleLowerCase("pt-BR"), [search]);
+
   const filteredCards = React.useMemo(() => cards.filter((c) => {
     if (effectivePersonIds && !effectivePersonIds.has(c.responsibleId)) return false;
     if (effectiveStatusKeys && !effectiveStatusKeys.has(c.status)) return false;
     if (!matchesDate(c.deadline, filters.date, todayStart)) return false;
+    if (searchQuery) {
+      const hay = `${c.title} ${c.client.name} ${c.responsible.name}`.toLocaleLowerCase("pt-BR");
+      if (!hay.includes(searchQuery)) return false;
+    }
     return true;
-  }), [cards, effectivePersonIds, effectiveStatusKeys, filters.date, todayStart]);
+  }), [cards, effectivePersonIds, effectiveStatusKeys, filters.date, todayStart, searchQuery]);
 
   const visibleMembers = React.useMemo(() => {
     if (filters.onlyMe) {
@@ -259,6 +265,25 @@ export function BoardClient({
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            <label className="inline-flex items-center gap-1.5 h-9 rounded-md border border-[#e0e0e0] bg-white px-2.5 text-[#555] w-[240px]">
+              <Search className="size-3.5 text-[#999]" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Buscar demanda, cliente…"
+                className="flex-1 bg-transparent text-[11.5px] outline-none placeholder:text-[#aaa]"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="grid place-items-center size-4 rounded text-[#999] hover:text-[#333] hover:bg-[#f2f2f2]"
+                  aria-label="Limpar busca"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </label>
             {canManage && (
               <Button variant="primary" size="md" onClick={() => setCreating({ open: true })}>
                 <IcPlus className="size-3.5" /> Nova demanda
@@ -279,7 +304,6 @@ export function BoardClient({
             totalCount={cards.length}
             currentUserIsResponsible={currentUserIsResponsible}
           />
-          {canManage && <StageManager teamId={data.team.id} flow={flow} />}
           <span className="ml-auto text-[10.5px] text-text-3 tabular">
             {filteredCards.length !== cards.length ? `${filteredCards.length} de ${cards.length}` : `${cards.length} demandas`}
           </span>
@@ -289,7 +313,7 @@ export function BoardClient({
       {/* ------------ Corpo ------------ */}
       <div className="p-4 flex-1 min-h-0 overflow-hidden bg-[#fafafa]">
         {view === "list" ? (
-          <BoardListView cards={filteredCards} flow={flow} onOpen={setOpenCardId} />
+          <BoardListView cards={filteredCards} flow={flow} members={peopleForFilters} onOpen={setOpenCardId} />
         ) : (
           <DndContext id="board-dnd" sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
             <div className="h-full flex gap-3 overflow-x-auto scrollbar-clean pb-2">

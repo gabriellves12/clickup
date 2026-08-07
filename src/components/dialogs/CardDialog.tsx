@@ -158,7 +158,7 @@ export function CardDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[3px] data-[state=open]:animate-[overlayShow_150ms_ease-out]" />
-        <Dialog.Content className="fixed z-50 inset-y-0 right-0 w-[min(760px,100vw)] bg-bg border-l border-border shadow-e5 flex flex-col outline-none data-[state=open]:animate-[drawerIn_280ms_cubic-bezier(.2,0,0,1)]">
+        <Dialog.Content className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(760px,calc(100vw-24px))] max-h-[min(88vh,900px)] rounded-xl bg-bg border border-border shadow-e5 flex flex-col outline-none data-[state=open]:animate-[contentShow_180ms_cubic-bezier(.2,0,0,1)]">
           <header className="h-[78px] shrink-0 flex items-center justify-between gap-4 px-7 bg-surface border-b border-border">
             <div>
               <span className="text-[10px] font-semibold tracking-[.18em] text-text-3 uppercase">{readOnly ? "Visualização" : editing ? "Editar entrega" : "Nova entrega"}</span>
