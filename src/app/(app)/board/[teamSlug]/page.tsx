@@ -1,6 +1,5 @@
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { findTeam } from "@/lib/board-config";
 import { BoardClient } from "@/components/board/BoardClient";
 import type { BoardData } from "@/components/board/types";
 import { requireCurrentUser } from "@/lib/current-user";
@@ -9,12 +8,11 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
   const user = await requireCurrentUser();
   if (user.role === "client") redirect("/portal");
   const { teamSlug } = await params;
-  const cfg = findTeam(teamSlug);
-  if (!cfg) notFound();
 
   const team = await prisma.team.findUnique({
     where: { slug: teamSlug },
     include: {
+      statuses: { orderBy: { order: "asc" } },
       members: { include: { person: true }, orderBy: { order: "asc" } },
       cards: {
         include: { client: true, responsible: true },
@@ -24,19 +22,26 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
   });
   if (!team) notFound();
 
-  const clients = await prisma.client.findMany({
-    include: {
-      linkTree: { include: { items: { orderBy: { order: "asc" } } } },
-    },
-    orderBy: { name: "asc" },
-  });
-  const allPeople = await prisma.person.findMany({ orderBy: { name: "asc" } });
-  const products = await prisma.product.findMany({ orderBy: [{ clientId: "asc" }, { name: "asc" }] });
-  const demandTypes = await prisma.demandType.findMany({ orderBy: { order: "asc" } });
+  const flow = team.statuses.map((s) => ({ key: s.key, label: s.label, tone: s.tone }));
+
+  const [clients, allPeople, products, demandTypes] = await Promise.all([
+    prisma.client.findMany({
+      include: {
+        linkTree: { include: { items: { orderBy: { order: "asc" } } } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    prisma.person.findMany({
+      where: { role: { in: ["admin", "manager", "member"] } },
+      orderBy: { name: "asc" },
+    }),
+    prisma.product.findMany({ orderBy: [{ clientId: "asc" }, { name: "asc" }] }),
+    prisma.demandType.findMany({ orderBy: { order: "asc" } }),
+  ]);
 
   const data: BoardData = {
     team: { id: team.id, slug: team.slug, name: team.name },
-    flow: cfg.flow,
+    flow,
     members: team.members.map((m) => ({
       person: {
         id: m.person.id,

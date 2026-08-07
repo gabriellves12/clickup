@@ -15,11 +15,34 @@ model Team {
   id        String   @id @default(cuid())
   slug      String   @unique
   name      String
+  kind      String   @default("TEAM") // TEAM (operacional) | CLIENT (quadro do cliente)
+  clientId  String?  // preenchido quando kind = CLIENT
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
-  members TeamMember[]
-  cards   Card[]
+  members  TeamMember[]
+  cards    Card[]
+  statuses TeamStatus[]
+  client   Client? @relation("ClientTeams", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([kind])
+  @@index([clientId])
+}
+
+// Colunas dinâmicas de cada quadro. Substitui o board-config.ts.
+model TeamStatus {
+  id        String   @id @default(cuid())
+  teamId    String
+  key       String   // slug estável usado por Card.status (ex.: EM_PRODUCAO)
+  label     String
+  order     Float    @default(1000)
+  tone      String?  // neutral | info | doing | review | done | warn
+  createdAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, key])
+  @@index([teamId, order])
 }
 
 model Person {
@@ -32,9 +55,9 @@ model Person {
   clientId  String?
   createdAt DateTime @default(now())
 
-  teams TeamMember[]
-  cards Card[]
-  client Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  teams  TeamMember[]
+  cards  Card[]
+  client Client?      @relation(fields: [clientId], references: [id], onDelete: SetNull)
 
   @@index([clientId])
 }
@@ -56,37 +79,38 @@ model TeamMember {
 // Clientes & árvore de links
 // -----------------------------------------------------------------------------
 model Client {
-  id             String    @id @default(cuid())
-  name           String
-  initials       String
-  tipoContrato   String    @default("FIXO")   // FIXO | FREELA
-  status         String    @default("ATIVO")  // ATIVO | ENCERRADO
-  startDate      DateTime?
-  endDate        DateTime?
-  contractUrl    String?
-  contractMonths Int?
-  whatsappUrl    String?
-  portalUserLimit Int      @default(5)
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(cuid())
+  name            String
+  initials        String
+  tipoContrato    String    @default("FIXO") // FIXO | FREELA
+  status          String    @default("ATIVO") // ATIVO | ENCERRADO
+  startDate       DateTime?
+  endDate         DateTime?
+  contractUrl     String?
+  contractMonths  Int?
+  whatsappUrl     String?
+  portalUserLimit Int       @default(5)
+  createdAt       DateTime  @default(now())
 
   linkTree LinkTree?
   products Product[]
   cards    Card[]
   users    Person[]
+  teams    Team[]   @relation("ClientTeams")
 
   @@index([status])
   @@index([tipoContrato])
 }
 
 model Product {
-  id          String   @id @default(cuid())
-  name        String
-  driveUrl    String?
-  figmaUrl    String?
-  photosUrl   String?
+  id           String   @id @default(cuid())
+  name         String
+  driveUrl     String?
+  figmaUrl     String?
+  photosUrl    String?
   observations String?
-  clientId    String
-  createdAt   DateTime @default(now())
+  clientId     String
+  createdAt    DateTime @default(now())
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   cards  Card[]
@@ -116,14 +140,14 @@ model LinkTree {
 }
 
 model LinkTreeItem {
-  id          String  @id @default(cuid())
+  id          String   @id @default(cuid())
   linkTreeId  String
-  category    String  // drive | figma | photos | instagram | product | cloudflare | hosting | wordpress | custom
+  category    String // drive | figma | photos | instagram | product | cloudflare | hosting | wordpress | custom
   label       String
   url         String?
   observation String? // login, notas
   parentId    String? // aninhamento (produtos por pasta / figma)
-  order       Int     @default(0)
+  order       Int      @default(0)
   createdAt   DateTime @default(now())
 
   linkTree LinkTree       @relation(fields: [linkTreeId], references: [id], onDelete: Cascade)
@@ -137,24 +161,24 @@ model LinkTreeItem {
 // Cards de demanda
 // -----------------------------------------------------------------------------
 model Card {
-  id               String    @id @default(cuid())
-  title            String
-  description      String?
-  briefing         String?
-  variation        String?  // JSON: string[]
-  copyUrl          String?
-  referenceUrl     String?
-  attachmentDriveUrl String?
-  externalMaterials String?
-  useExternalMaterials Boolean @default(false)
-  startDate        DateTime?
-  priority         String @default("NORMAL")
-  status           String    // EM_PRODUCAO | APROVACAO_INTERNA | APROVACAO_CLIENTE | ALTERACAO | FINALIZADO | PROPAGACAO_DNS | IMPLEMENTACAO | OTIMIZACAO
-  clientStatus     String    @default("PENDENTES") // PENDENTES | PARA_PRODUCAO | EM_PRODUCAO | APROVACAO | FINALIZADO
-  tipoProjeto      String    @default("PADRAO") // PADRAO | PAGINA
-  pendenteMaterial Boolean   @default(false)
-  deadline         DateTime?
-  order            Float     @default(1000)
+  id                   String    @id @default(cuid())
+  title                String
+  description          String?
+  briefing             String?
+  variation            String? // JSON: string[]
+  copyUrl              String?
+  referenceUrl         String?
+  attachmentDriveUrl   String?
+  externalMaterials    String?
+  useExternalMaterials Boolean   @default(false)
+  startDate            DateTime?
+  priority             String    @default("NORMAL")
+  status               String // EM_PRODUCAO | APROVACAO_INTERNA | APROVACAO_CLIENTE | ALTERACAO | FINALIZADO | PROPAGACAO_DNS | IMPLEMENTACAO | OTIMIZACAO
+  clientStatus         String    @default("PENDENTES") // PENDENTES | PARA_PRODUCAO | EM_PRODUCAO | APROVACAO | FINALIZADO
+  tipoProjeto          String    @default("PADRAO") // PADRAO | PAGINA
+  pendenteMaterial     Boolean   @default(false)
+  deadline             DateTime?
+  order                Float     @default(1000)
 
   clientId      String
   productId     String?
@@ -162,17 +186,19 @@ model Card {
   responsibleId String
   teamId        String
 
-  client      Client @relation(fields: [clientId], references: [id])
-  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  client      Client      @relation(fields: [clientId], references: [id])
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
   demandType  DemandType? @relation(fields: [demandTypeId], references: [id], onDelete: SetNull)
-  responsible Person @relation(fields: [responsibleId], references: [id])
-  team        Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  responsible Person      @relation(fields: [responsibleId], references: [id])
+  team        Team        @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([teamId, responsibleId, status, order])
   @@index([teamId, deadline])
+  @@index([clientId, clientStatus, order])
+  @@index([status, updatedAt])
 }
 
 // -----------------------------------------------------------------------------

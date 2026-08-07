@@ -2,25 +2,63 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+const DESIGN_COLUMNS = [
+  { key: "EM_PRODUCAO",       label: "Em Produção",          tone: "doing"  },
+  { key: "APROVACAO_INTERNA", label: "Aprovação Interna",    tone: "review" },
+  { key: "APROVACAO_CLIENTE", label: "Aprovação do Cliente", tone: "review" },
+  { key: "ALTERACAO",         label: "Alteração",            tone: "warn"   },
+  { key: "FINALIZADO",        label: "Finalizado",           tone: "done"   },
+];
+
+const WEB_COLUMNS = [
+  { key: "PROPAGACAO_DNS",    label: "Propagação de DNS",    tone: "info"   },
+  { key: "IMPLEMENTACAO",     label: "Implementação",        tone: "doing"  },
+  { key: "OTIMIZACAO",        label: "Otimização",           tone: "doing"  },
+  { key: "APROVACAO_INTERNA", label: "Aprovação Interna",    tone: "review" },
+  { key: "APROVACAO_CLIENTE", label: "Aprovação do Cliente", tone: "review" },
+  { key: "ALTERACAO",         label: "Alteração",            tone: "warn"   },
+  { key: "FINALIZADO",        label: "Finalizado",           tone: "done"   },
+];
+
+const CLIENT_DEFAULT_COLUMNS = [
+  { key: "PENDENTES",     label: "Pendentes",     tone: "neutral" },
+  { key: "PARA_PRODUCAO", label: "Para produção", tone: "info"    },
+  { key: "EM_PRODUCAO",   label: "Em produção",   tone: "doing"   },
+  { key: "APROVACAO",     label: "Aprovação",     tone: "review"  },
+  { key: "FINALIZADO",    label: "Finalizado",    tone: "done"    },
+];
+
+async function seedColumns(teamId: string, columns: { key: string; label: string; tone: string }[]) {
+  await prisma.teamStatus.createMany({
+    data: columns.map((col, index) => ({
+      teamId, key: col.key, label: col.label, tone: col.tone, order: (index + 1) * 1000,
+    })),
+  });
+}
+
 async function main() {
-  // Limpa tudo (SQLite dev)
+  // Limpa tudo (dev/staging)
   await prisma.card.deleteMany();
+  await prisma.teamStatus.deleteMany();
   await prisma.demandType.deleteMany();
   await prisma.product.deleteMany();
   await prisma.linkTreeItem.deleteMany();
   await prisma.linkTree.deleteMany();
   await prisma.teamMember.deleteMany();
-  await prisma.client.deleteMany();
-  await prisma.person.deleteMany();
   await prisma.team.deleteMany();
+  await prisma.person.deleteMany();
+  await prisma.client.deleteMany();
 
-  // ------------------------- Times
+  // ------------------------- Times operacionais
   const design = await prisma.team.create({
-    data: { slug: "design", name: "Time Design", order: 1 },
+    data: { slug: "design", name: "Design", kind: "TEAM", order: 1 },
   });
+  await seedColumns(design.id, DESIGN_COLUMNS);
+
   const web = await prisma.team.create({
-    data: { slug: "web-design", name: "Time Web Design", order: 2 },
+    data: { slug: "web-design", name: "Web Design", kind: "TEAM", order: 2 },
   });
+  await seedColumns(web.id, WEB_COLUMNS);
 
   // ------------------------- Pessoas
   const gabriel = await prisma.person.create({ data: { name: "Gabriel Alves", email: "gabriellves12@gmail.com", initials: "GA", color: "av-1", role: "admin" } });
@@ -76,6 +114,15 @@ async function main() {
     { name: "Cliente Galla Consultoria", email: "cliente.galla@thinkcontrol.com.br", initials: "GC", role: "client", clientId: casaVerde.id },
     { name: "Cliente Elias Maman", email: "cliente.elias@thinkcontrol.com.br", initials: "EM", role: "client", clientId: belaVida.id },
   ] });
+
+  // Um quadro (kind=CLIENT) por cliente com as colunas padrão
+  for (const [i, c] of [fe, studio, casaVerde, belaVida].entries()) {
+    const slug = c.name.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const team = await prisma.team.create({
+      data: { slug: `cliente-${slug}`, name: c.name, kind: "CLIENT", clientId: c.id, order: 100 + i },
+    });
+    await seedColumns(team.id, CLIENT_DEFAULT_COLUMNS);
+  }
 
   await prisma.product.createMany({ data: [
     { clientId: fe.id, name: "Protocolo Origem", driveUrl: "https://drive.google.com/drive/folders/protocolo-origem", figmaUrl: "https://figma.com/file/protocolo-origem", photosUrl: "https://drive.google.com/drive/folders/fotos-fe-alves" },

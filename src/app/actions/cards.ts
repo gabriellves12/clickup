@@ -2,8 +2,32 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { targetTeamSlugFor } from "@/lib/board-config";
+import { getWebRoutingTeamSlug } from "@/lib/teams";
 import { requireCurrentUser, requireOperationalManager } from "@/lib/current-user";
+
+// Roteia por tipo do projeto para o slug do time destino.
+// PAGINA vai pro time de web (convenção); qualquer outro fica no time atual.
+async function resolveDestSlug(tipoProjeto: string, fallbackSlug: string) {
+  if (tipoProjeto === "PAGINA") return getWebRoutingTeamSlug();
+  return fallbackSlug;
+}
+
+async function statusKeysForTeamSlug(slug: string): Promise<Set<string>> {
+  const team = await prisma.team.findUnique({
+    where: { slug },
+    include: { statuses: { select: { key: true } } },
+  });
+  return new Set(team?.statuses.map((s) => s.key) ?? []);
+}
+
+async function firstStatusKeyForTeamId(teamId: string): Promise<string> {
+  const first = await prisma.teamStatus.findFirst({
+    where: { teamId },
+    orderBy: { order: "asc" },
+    select: { key: true },
+  });
+  return first?.key ?? "EM_PRODUCAO";
+}
 
 type CardInput = {
   id?: string;
@@ -29,34 +53,18 @@ type CardInput = {
   priority?: string;
 };
 
-async function resolveTeamIdFor(tipoProjeto: string, fallbackSlug: string) {
-  const slug = targetTeamSlugFor(tipoProjeto);
-  const team =
-    (await prisma.team.findUnique({ where: { slug } })) ??
-    (await prisma.team.findUnique({ where: { slug: fallbackSlug } }));
-  if (!team) throw new Error("Time não encontrado");
-  return team.id;
-}
-
-async function firstAllowedStatusFor(teamId: string) {
-  const team = await prisma.team.findUnique({ where: { id: teamId } });
-  if (!team) throw new Error("Time não encontrado");
-  const { TEAMS } = await import("@/lib/board-config");
-  const cfg = TEAMS.find((t) => t.slug === team.slug);
-  return cfg?.flow[0]?.key ?? "EM_PRODUCAO";
-}
-
 export async function createOrUpdateCard(input: CardInput) {
   await requireOperationalManager();
-  const teamId = await resolveTeamIdFor(input.tipoProjeto, input.currentTeamSlug);
 
-  // Se o status enviado não pertencer ao time destino, cai no primeiro do time
-  const { TEAMS } = await import("@/lib/board-config");
-  const destSlug = targetTeamSlugFor(input.tipoProjeto);
-  const flowKeys = TEAMS.find((t) => t.slug === destSlug)?.flow.map((f) => f.key) ?? [];
-  const status = flowKeys.includes(input.status)
+  const destSlug = await resolveDestSlug(input.tipoProjeto, input.currentTeamSlug);
+  const destTeam = await prisma.team.findUnique({ where: { slug: destSlug } });
+  if (!destTeam) throw new Error("Quadro destino não encontrado.");
+  const teamId = destTeam.id;
+
+  const flowKeys = await statusKeysForTeamSlug(destSlug);
+  const status = flowKeys.has(input.status)
     ? input.status
-    : await firstAllowedStatusFor(teamId);
+    : await firstStatusKeyForTeamId(teamId);
 
   const data = {
     title: input.title.trim(),
@@ -114,16 +122,32 @@ export async function moveCard(params: {
 }) {
   const user = await requireCurrentUser();
   if (user.role === "client") throw new Error("Clientes não podem mover tarefas.");
-  const card = await prisma.card.findUnique({ where: { id: params.cardId } });
+  const card = await prisma.card.findUnique({
+    where: { id: params.cardId },
+    include: { team: { select: { slug: true } } },
+  });
   if (!card) return;
+
+  const allowedStatuses = await statusKeysForTeamSlug(card.team.slug);
+  if (!allowedStatuses.has(params.toStatus)) throw new Error("Etapa inválida para este quadro.");
+
+  const destinationMember = await prisma.teamMember.findUnique({
+    where: { teamId_personId: { teamId: card.teamId, personId: params.toResponsibleId } },
+    select: { personId: true },
+  });
+  if (!destinationMember) throw new Error("Responsável inválido para este quadro.");
 
   // Reordenação: order = média entre antes e depois; se não existir, extremo
   let newOrder = card.order;
   const before = params.beforeCardId
-    ? await prisma.card.findUnique({ where: { id: params.beforeCardId } })
+    ? await prisma.card.findFirst({
+        where: { id: params.beforeCardId, teamId: card.teamId, responsibleId: params.toResponsibleId, status: params.toStatus },
+      })
     : null;
   const after = params.afterCardId
-    ? await prisma.card.findUnique({ where: { id: params.afterCardId } })
+    ? await prisma.card.findFirst({
+        where: { id: params.afterCardId, teamId: card.teamId, responsibleId: params.toResponsibleId, status: params.toStatus },
+      })
     : null;
 
   if (before && after) newOrder = (before.order + after.order) / 2;
@@ -151,7 +175,7 @@ export async function moveCard(params: {
     },
   });
 
-  revalidatePath(`/board/${params.currentTeamSlug}`);
+  revalidatePath(`/board/${card.team.slug}`);
 }
 
 export async function togglePendenteMaterial(id: string, currentTeamSlug: string) {

@@ -8,7 +8,6 @@ import { Button, Field, Input, Select, Textarea } from "@/components/ui/primitiv
 import { CategoryIcon, IcAlert, IcChevronDown, IcClose, IcExternal, IcPlus, IcTrash } from "@/components/icons";
 import { createOrUpdateCard, deleteCard } from "@/app/actions/cards";
 import { createClientQuick, createProductQuick } from "@/app/actions/catalog";
-import { TEAMS, targetTeamSlugFor } from "@/lib/board-config";
 import { cn } from "@/lib/cn";
 import type { CardLite, ClientWithLinks, DemandTypeLite, PersonLite, ProductLite } from "@/components/board/types";
 import type { StatusDef } from "@/lib/board-config";
@@ -80,9 +79,10 @@ export function CardDialog({
   const demand = demandTypes.find((item) => item.id === form.demandTypeId);
   const clientProducts = localProducts.filter((item) => item.clientId === form.clientId);
   const tipoProjeto = demand?.routeToWeb ? "PAGINA" : "PADRAO";
-  const destSlug = targetTeamSlugFor(tipoProjeto);
-  const destFlow = TEAMS.find((team) => team.slug === destSlug)?.flow ?? flow;
-  const willReroute = destSlug !== currentTeamSlug;
+  // Quando um tipo com routeToWeb=true é escolhido, o server roteia o card para
+  // o quadro Web e escolhe a coluna inicial daquele quadro. Aqui só sinalizamos.
+  const willReroute = tipoProjeto === "PAGINA" && currentTeamSlug !== "web-design";
+  const destFlow = flow;
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
   const toggleVariation = (value: string) => set("variations", form.variations.includes(value) ? form.variations.filter((item) => item !== value) : [...form.variations, value]);
@@ -113,7 +113,8 @@ export function CardDialog({
         status: form.status, tipoProjeto, startDate: form.startDate, deadline: form.deadline,
         priority: form.priority, pendenteMaterial: form.pendenteMaterial, currentTeamSlug,
       });
-      if (willReroute) router.push(`/board/${destSlug}`);
+      // Se o server roteou o card para outro quadro (tipo página → web), leva o usuário até lá.
+      if (willReroute) router.push("/board/web-design");
       onOpenChange(false);
     });
   }
@@ -203,7 +204,7 @@ export function CardDialog({
                 </div>
 
                 <Field label="Tipo de demanda" className="mt-5">
-                  <div className="flex flex-wrap gap-1.5">{demandTypes.map((item) => <Chip key={item.id} selected={form.demandTypeId === item.id} onClick={() => { const nextFlow = TEAMS.find((team) => team.slug === targetTeamSlugFor(item.routeToWeb ? "PAGINA" : "PADRAO"))?.flow ?? flow; updateDefinition({ demandTypeId: item.id, variations: [], status: nextFlow.some((status) => status.key === form.status) ? form.status : nextFlow[0]?.key }); }}><b>[{item.prefix}]</b> {item.name}</Chip>)}</div>
+                  <div className="flex flex-wrap gap-1.5">{demandTypes.map((item) => <Chip key={item.id} selected={form.demandTypeId === item.id} onClick={() => { updateDefinition({ demandTypeId: item.id, variations: [] }); }}><b>[{item.prefix}]</b> {item.name}</Chip>)}</div>
                 </Field>
 
                 {demand && <Field label="Formato / variação" className="mt-5">
