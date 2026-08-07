@@ -214,7 +214,7 @@ async function main() {
     const result = [];
     for (const client of clients) result.push(await syncClient(db, client));
     return result;
-  });
+  }, { maxWait: 10_000, timeout: 60_000 });
   const links = summary.reduce((total, client) => total + client.links, 0);
   const products = summary.reduce((total, client) => total + client.products, 0);
   console.log(`Central importada: ${summary.length} clientes, ${products} produtos e ${links} links organizados.`);
