@@ -6,7 +6,8 @@ import {
   closestCenter, DragOverlay, useDroppable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useTransition } from "react";
 import { AlertTriangle, Lock, Search, X } from "lucide-react";
 import { moveCard } from "@/app/actions/cards";
@@ -36,6 +37,12 @@ const parseDropId = (id: string): { kind: "person" | "stage"; key: string } | nu
   if (kind !== "person" && kind !== "stage") return null;
   return { kind, key };
 };
+
+// Cards na lens "Materiais Pendentes" usam id prefixado para não colidir com o
+// sortable da coluna real. Extrai o id real do card a partir do sortable id.
+const PENDING_PREFIX = "pending::";
+const realCardId = (sortableId: string) =>
+  sortableId.startsWith(PENDING_PREFIX) ? sortableId.slice(PENDING_PREFIX.length) : sortableId;
 
 // ---------------- Component ----------------
 
@@ -169,13 +176,14 @@ export function BoardClient({
   }, [canManage, currentUserId]);
 
   // ------------ Drag & Drop ------------
-  function onDragStart(e: DragStartEvent) { setActiveId(String(e.active.id)); }
+  function onDragStart(e: DragStartEvent) { setActiveId(realCardId(String(e.active.id))); }
 
   function onDragEnd(e: DragEndEvent) {
     setActiveId(null);
     const { active, over } = e;
     if (!over) return;
-    const source = cards.find((c) => c.id === active.id);
+    const activeCardId = realCardId(String(active.id));
+    const source = cards.find((c) => c.id === activeCardId);
     if (!source) return;
 
     // Descobre a coluna destino: pode vir do container (dropId) ou de um card (herda coluna do card alvo).
@@ -185,7 +193,8 @@ export function BoardClient({
     if (over.data.current?.type === "column") {
       targetCol = columns.find((c) => c.id === String(over.id));
     } else {
-      overCard = cards.find((c) => c.id === over.id);
+      const overCardId = realCardId(String(over.id));
+      overCard = cards.find((c) => c.id === overCardId);
       if (overCard) {
         const key = overCard.status === PERSON_COLUMN_STATUS
           ? `person::${overCard.responsibleId}`
@@ -400,6 +409,7 @@ function BoardColumnView({
 
   return (
     <section
+      ref={setNodeRef}
       className={cn(
         "w-[268px] shrink-0 rounded-lg overflow-hidden flex flex-col transition-colors duration-100 border",
         isOver && !restrictedForCurrentUser && "outline outline-2 outline-offset-[-1px]",
@@ -427,7 +437,7 @@ function BoardColumnView({
         />
       )}
 
-      <div ref={setNodeRef} className="flex-1 min-h-0 overflow-y-auto scrollbar-clean grid gap-2 p-2 content-start">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-clean grid gap-2 p-2 content-start">
         <SortableContext items={items} strategy={verticalListSortingStrategy}>
           {cards.map((c) => (
             <TaskCard
@@ -499,6 +509,7 @@ function getStageNeighbors(flow: FlowColumnDef[], key: string) {
 /* ------------------------- Pending column (lens) ------------------------- */
 
 function PendingColumn({ cards, onOpen }: { cards: CardLite[]; onOpen: (id: string) => void }) {
+  const items = React.useMemo(() => cards.map((c) => `${PENDING_PREFIX}${c.id}`), [cards]);
   return (
     <section className="w-[268px] shrink-0 bg-white border border-[#e7e7e7] rounded-lg overflow-hidden flex flex-col">
       <header
@@ -515,30 +526,53 @@ function PendingColumn({ cards, onOpen }: { cards: CardLite[]; onOpen: (id: stri
             Sem pendências. Tudo em dia.
           </div>
         )}
-        {cards.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => onOpen(c.id)}
-            className="text-left grid gap-1.5 bg-white border rounded-md p-3"
-            style={{
-              borderColor: "color-mix(in oklab, var(--danger-strong) 45%, transparent)",
-              boxShadow: "inset 2px 0 0 var(--danger-strong)",
-            }}
-          >
-            <span className="text-[10px] uppercase tracking-[0.02em] text-text-3">{c.client.name}</span>
-            <span className="text-[12.5px] font-medium tracking-tight text-text">{c.title}</span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10.5px] font-medium" style={{ color: "var(--danger-strong)" }}>
-                {c.deadline ? overdueLabel(c.deadline) : c.pendenteMaterial ? "material pendente" : ""}
-              </span>
-              <span className="flex-1" />
-              <Avatar size="sm" initials={c.responsible.initials} colorKey={c.responsible.color} />
-            </div>
-          </button>
-        ))}
+        <SortableContext items={items} strategy={verticalListSortingStrategy}>
+          {cards.map((c) => (
+            <PendingCardItem key={c.id} card={c} onOpen={onOpen} />
+          ))}
+        </SortableContext>
       </div>
     </section>
+  );
+}
+
+function PendingCardItem({ card, onOpen }: { card: CardLite; onOpen: (id: string) => void }) {
+  const sortableId = `${PENDING_PREFIX}${card.id}`;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sortableId, data: { card } });
+  return (
+    <article
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+        borderColor: "color-mix(in oklab, var(--danger-strong) 45%, transparent)",
+        boxShadow: "inset 2px 0 0 var(--danger-strong)",
+      }}
+      {...attributes}
+      {...listeners}
+      onDoubleClick={() => onOpen(card.id)}
+      className="cursor-grab active:cursor-grabbing select-none text-left grid gap-1.5 bg-white border rounded-md p-3"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => event.key === "Enter" && onOpen(card.id)}
+    >
+      <span className="text-[10px] uppercase tracking-[0.02em] text-text-3">{card.client.name}</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onOpen(card.id); }}
+        className="text-left text-[12.5px] font-medium tracking-tight text-text"
+      >
+        {card.title}
+      </button>
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10.5px] font-medium" style={{ color: "var(--danger-strong)" }}>
+          {card.deadline ? overdueLabel(card.deadline) : card.pendenteMaterial ? "material pendente" : ""}
+        </span>
+        <span className="flex-1" />
+        <Avatar size="sm" initials={card.responsible.initials} colorKey={card.responsible.color} />
+      </div>
+    </article>
   );
 }
 
