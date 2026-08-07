@@ -16,8 +16,6 @@ import { TaskCard } from "./TaskCard";
 import { EditableBoardTitle } from "./EditableBoardTitle";
 import { ColumnHeader } from "./ColumnHeader";
 import { AddColumnButton } from "./AddColumnButton";
-import { BoardListView } from "./BoardListView";
-import { ViewSwitcher, type BoardView } from "./ViewSwitcher";
 import { FiltersPopover } from "./FiltersPopover";
 import { emptyFilters, matchesDate, type BoardFiltersState } from "./BoardFilters";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
@@ -47,7 +45,6 @@ export function BoardClient({
   const [cards, setCards] = React.useState<CardLite[]>(data.cards);
   React.useEffect(() => setCards(data.cards), [data.cards]);
 
-  const [view, setView] = React.useState<BoardView>("board");
   const [filters, setFilters] = React.useState<BoardFiltersState>(emptyFilters);
   const [search, setSearch] = React.useState("");
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -294,7 +291,6 @@ export function BoardClient({
         </div>
 
         <div className="mt-3 flex items-center gap-2 flex-wrap">
-          <ViewSwitcher value={view} onChange={setView} />
           <FiltersPopover
             filters={filters}
             onChange={setFilters}
@@ -313,12 +309,9 @@ export function BoardClient({
 
       {/* ------------ Corpo ------------ */}
       <div className="p-4 flex-1 min-h-0 overflow-hidden bg-[#fafafa]">
-        {view === "list" ? (
-          <BoardListView cards={filteredCards} flow={flow} members={peopleForFilters} onOpen={setOpenCardId} />
-        ) : (
-          <DndContext id="board-dnd" sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-            <div className="h-full flex gap-3 overflow-x-auto scrollbar-clean pb-2">
-              <PendingColumn cards={overdueOrPending} onOpen={setOpenCardId} />
+        <DndContext id="board-dnd" sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <PanScrollRow className="h-full flex gap-3 overflow-x-auto scrollbar-clean pb-2">
+            <PendingColumn cards={overdueOrPending} onOpen={setOpenCardId} />
 
               {columns.map((col) => {
                 const list = cardsByColumn.get(col.id) ?? [];
@@ -345,25 +338,24 @@ export function BoardClient({
                 );
               })}
 
-              {canManage && (
-                <div className="w-[240px] shrink-0 pt-1">
-                  <AddColumnButton teamId={data.team.id} />
-                </div>
-              )}
-            </div>
+            {canManage && (
+              <div className="w-[240px] shrink-0 pt-1">
+                <AddColumnButton teamId={data.team.id} />
+              </div>
+            )}
+          </PanScrollRow>
 
-            <DragOverlay dropAnimation={null}>
-              {activeCard ? (
-                <div className="rotate-1">
-                  <TaskCard
-                    card={activeCard}
-                    onOpen={() => {}}
-                  />
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        )}
+          <DragOverlay dropAnimation={null}>
+            {activeCard ? (
+              <div className="rotate-1">
+                <TaskCard
+                  card={activeCard}
+                  onOpen={() => {}}
+                />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       <CardDialog
@@ -556,4 +548,56 @@ function overdueLabel(iso: string) {
   const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const diff = Math.floor((t0.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
   return `atrasado ${diff}d`;
+}
+
+/* ------------------------- Pan-scroll horizontal -------------------------
+
+Permite arrastar o board com o mouse em áreas mortas (fundo entre colunas,
+áreas vazias dentro de coluna). Se o pointerdown for em um card, botão, link,
+input ou textarea, deixa o dnd-kit / clique nativo lidar.
+--------------------------------------------------------------------------- */
+
+const PAN_IGNORE_SELECTOR = "article, button, a, input, textarea, select, label, [role='button']";
+
+function PanScrollRow({ children, className }: { children: React.ReactNode; className?: string }) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const drag = React.useRef<{ startX: number; startScroll: number; pointerId: number } | null>(null);
+
+  const onPointerDown = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const target = event.target as HTMLElement;
+    if (target.closest(PAN_IGNORE_SELECTOR)) return;
+    const node = ref.current;
+    if (!node) return;
+    drag.current = { startX: event.clientX, startScroll: node.scrollLeft, pointerId: event.pointerId };
+    node.setPointerCapture(event.pointerId);
+    node.style.cursor = "grabbing";
+  }, []);
+
+  const onPointerMove = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current || !ref.current) return;
+    const dx = event.clientX - drag.current.startX;
+    ref.current.scrollLeft = drag.current.startScroll - dx;
+  }, []);
+
+  const endDrag = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const node = ref.current;
+    if (!drag.current || !node) return;
+    if (node.hasPointerCapture(drag.current.pointerId)) node.releasePointerCapture(drag.current.pointerId);
+    drag.current = null;
+    node.style.cursor = "";
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={cn("cursor-grab", className)}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
+      {children}
+    </div>
+  );
 }
