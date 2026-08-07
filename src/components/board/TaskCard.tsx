@@ -33,7 +33,9 @@ function deadlineColors(tone: "muted" | "today" | "overdue" | "soon") {
   }
 }
 
-export function TaskCard({
+export const TaskCard = React.memo(TaskCardImpl);
+
+function TaskCardImpl({
   card, isDone, onOpen,
 }: {
   card: CardLite;

@@ -54,10 +54,13 @@ export async function createOrUpdateCard(input: CardInput) {
   const teamId = destTeam.id;
 
   const flowKeys = await statusKeysForTeamSlug(destSlug);
-  // Card novo cai por padrão na coluna do responsável (PERSON_COLUMN).
-  // Se um status válido (PERSON_COLUMN ou etapa existente) foi passado, respeita.
-  const status = input.status === PERSON_COLUMN_STATUS || flowKeys.has(input.status)
-    ? input.status
+  // Regra: card NOVO sempre nasce na coluna do responsável (PERSON_COLUMN),
+  // ignorando qualquer status que o formulário tenha enviado.
+  // Edição preserva o status atual se for válido (etapa existente ou PERSON_COLUMN).
+  const status = input.id
+    ? (input.status === PERSON_COLUMN_STATUS || flowKeys.has(input.status)
+        ? input.status
+        : PERSON_COLUMN_STATUS)
     : PERSON_COLUMN_STATUS;
 
   const data = {

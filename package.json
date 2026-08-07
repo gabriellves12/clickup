@@ -12,6 +12,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:seed": "tsx prisma/seed.ts",
     "clients:import": "tsx --env-file=.env.local prisma/import-central-clients.ts",
+    "auth:seed:dry": "tsx --env-file=.env.local prisma/seed-auth.ts --dry-run",
     "auth:seed": "tsx --env-file=.env.local prisma/seed-auth.ts"
   },
   "prisma": {

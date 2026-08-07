@@ -103,10 +103,8 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
     })),
   };
 
-  const boardVersion = team.cards.map((card) => `${card.id}:${card.updatedAt.getTime()}`).join("|");
   return (
     <BoardClient
-      key={boardVersion}
       data={data}
       canManage={user.role === "admin" || user.role === "manager"}
       currentUserId={user.id}
