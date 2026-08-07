@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowUpRight, Building2, CheckCircle2, CircleAlert, FolderKanban, KeyRound,
   LayoutDashboard, LockKeyhole, MoreHorizontal, PanelsTopLeft, Pencil, Plus, Search,
-  ShieldCheck, UserCheck, UserPlus, UsersRound, X,
+  UserCheck, UserPlus, UsersRound, X,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { Avatar } from "@/components/ui/primitives";
@@ -63,17 +63,14 @@ function Overview({ people, clients, teams, activePeople, activeClients, clientA
     { label: "Clientes ativos", value: activeClients, note: `${clients.length} empresas cadastradas`, icon: Building2 },
     { label: "Quadros estruturados", value: teams.length, note: `${teams.filter((team) => team.kind === "CLIENT").length} áreas de cliente`, icon: FolderKanban },
   ];
-  return <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-    <div>
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[9px] font-medium uppercase tracking-[.14em] text-[#999]">Resumo operacional</p><h2 className="mt-1 text-[18px] font-semibold tracking-[-.035em]">A estrutura está sob controle.</h2></div><div className="flex gap-2"><ActionButton icon={UserPlus} onClick={onNewUser}>Liberar pessoa</ActionButton><ActionButton icon={Plus} onClick={onNewClient} primary>Novo cliente</ActionButton></div></div>
-      <div className="mt-5 grid gap-3 md:grid-cols-3">{stats.map(({ label, value, note, icon: Icon }) => <article key={label} className="rounded-xl border border-[#e4e4e4] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.025)]"><Icon className="size-4 text-[#666]" strokeWidth={1.6} /><p className="mt-7 text-[29px] font-semibold leading-none tracking-[-.055em] tabular">{value}</p><p className="mt-3 text-[10.5px] font-medium text-[#333]">{label}</p><p className="mt-1 text-[9.5px] text-[#999]">{note}</p></article>)}</div>
-      <section className="mt-6 overflow-hidden rounded-xl border border-[#e4e4e4] bg-white"><header className="flex items-center justify-between border-b border-[#ededed] px-4 py-3.5"><div><h3 className="text-[11.5px] font-medium">Pontos que pedem decisão</h3><p className="mt-0.5 text-[9.5px] text-[#999]">Exceções e pendências de estrutura.</p></div><CircleAlert className="size-4 text-[#666]" /></header><div className="divide-y divide-[#ededed]">
-        <OverviewLine icon={blocked > 0 ? LockKeyhole : CheckCircle2} title={blocked > 0 ? `${blocked} ${blocked === 1 ? "acesso bloqueado" : "acessos bloqueados"}` : "Nenhum acesso bloqueado"} description={blocked > 0 ? "Revise se essas pessoas ainda precisam permanecer sem acesso." : "Todas as pessoas cadastradas estão com acesso ativo."} href="/admin?tab=pessoas" />
-        <OverviewLine icon={PanelsTopLeft} title={`${clients.filter((client) => client.users.length === 0 && client.status === "ATIVO").length} portais sem contato liberado`} description="Cadastre ao menos uma pessoa para que cada cliente acompanhe suas demandas." href="/admin?tab=clientes" />
-        <OverviewLine icon={FolderKanban} title={`${teams.filter((team) => team.cardsCount === 0).length} quadros sem demandas`} description="Quadros vazios podem ser preparados, renomeados ou removidos na seção Estrutura." href="/admin?tab=estrutura" />
-      </div></section>
-    </div>
-    <aside className="rounded-xl border border-[#e2e2e2] bg-[#181818] p-5 text-white"><ShieldCheck className="size-4 text-white/70" /><p className="mt-8 text-[9px] font-medium uppercase tracking-[.14em] text-white/45">Ações administrativas</p><h3 className="mt-2 text-[17px] font-semibold leading-6 tracking-[-.04em]">Controle de acesso sem depender do suporte.</h3><p className="mt-2 text-[10.5px] leading-5 text-white/60">Crie usuários, altere perfis, interrompa o acesso e defina novas senhas por aqui.</p><Link href="/admin?tab=pessoas" className="mt-6 flex h-8 items-center justify-between rounded-md bg-white px-3 text-[10px] font-medium text-[#161616] hover:bg-[#efefef]">Administrar acessos <ArrowUpRight className="size-3.5" /></Link><Link href="/admin?tab=clientes" className="mt-2 flex h-8 items-center justify-between rounded-md border border-white/15 px-3 text-[10px] font-medium text-white/75 hover:bg-white/10 hover:text-white">Configurar clientes <ArrowUpRight className="size-3.5" /></Link></aside>
+  return <div>
+    <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-[9px] font-medium uppercase tracking-[.14em] text-[#999]">Resumo operacional</p><h2 className="mt-1 text-[18px] font-semibold tracking-[-.035em]">A estrutura está sob controle.</h2></div><div className="flex gap-2"><ActionButton icon={UserPlus} onClick={onNewUser}>Liberar pessoa</ActionButton><ActionButton icon={Plus} onClick={onNewClient} primary>Novo cliente</ActionButton></div></div>
+    <div className="mt-5 grid gap-3 md:grid-cols-3">{stats.map(({ label, value, note, icon: Icon }) => <article key={label} className="rounded-xl border border-[#e4e4e4] bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,.025)]"><Icon className="size-4 text-[#666]" strokeWidth={1.6} /><p className="mt-7 text-[29px] font-semibold leading-none tracking-[-.055em] tabular">{value}</p><p className="mt-3 text-[10.5px] font-medium text-[#333]">{label}</p><p className="mt-1 text-[9.5px] text-[#999]">{note}</p></article>)}</div>
+    <section className="mt-6 overflow-hidden rounded-xl border border-[#e4e4e4] bg-white"><header className="flex items-center justify-between border-b border-[#ededed] px-4 py-3.5"><div><h3 className="text-[11.5px] font-medium">Pontos que pedem decisão</h3><p className="mt-0.5 text-[9.5px] text-[#999]">Exceções e pendências de estrutura.</p></div><CircleAlert className="size-4 text-[#666]" /></header><div className="divide-y divide-[#ededed]">
+      <OverviewLine icon={blocked > 0 ? LockKeyhole : CheckCircle2} title={blocked > 0 ? `${blocked} ${blocked === 1 ? "acesso bloqueado" : "acessos bloqueados"}` : "Nenhum acesso bloqueado"} description={blocked > 0 ? "Revise se essas pessoas ainda precisam permanecer sem acesso." : "Todas as pessoas cadastradas estão com acesso ativo."} href="/admin?tab=pessoas" />
+      <OverviewLine icon={PanelsTopLeft} title={`${clients.filter((client) => client.users.length === 0 && client.status === "ATIVO").length} portais sem contato liberado`} description="Cadastre ao menos uma pessoa para que cada cliente acompanhe suas demandas." href="/admin?tab=clientes" />
+      <OverviewLine icon={FolderKanban} title={`${teams.filter((team) => team.cardsCount === 0).length} quadros sem demandas`} description="Quadros vazios podem ser preparados, renomeados ou removidos na seção Estrutura." href="/admin?tab=estrutura" />
+    </div></section>
   </div>;
 }
 

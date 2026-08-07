@@ -4,7 +4,8 @@
 //   NEXT_PUBLIC_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
 //   ADMIN_INITIAL_PASSWORD
-//   MEMBER_INITIAL_PASSWORD (usada para Gestão e Colaborador)
+//   MANAGER_INITIAL_PASSWORD
+//   MEMBER_INITIAL_PASSWORD
 //   CLIENT_INITIAL_PASSWORD
 //
 // Estratégia: todos são criados com email_confirm=true + senha por perfil.
@@ -42,12 +43,12 @@ async function main() {
 
   const passwords = {
     admin: process.env.ADMIN_INITIAL_PASSWORD,
-    manager: process.env.MEMBER_INITIAL_PASSWORD,
+    manager: process.env.MANAGER_INITIAL_PASSWORD,
     member: process.env.MEMBER_INITIAL_PASSWORD,
     client: process.env.CLIENT_INITIAL_PASSWORD,
   } as const;
   if (Object.values(passwords).some((password) => !password)) {
-    console.error("✗ Configure ADMIN_INITIAL_PASSWORD, MEMBER_INITIAL_PASSWORD e CLIENT_INITIAL_PASSWORD em .env.local.");
+    console.error("✗ Configure ADMIN_INITIAL_PASSWORD, MANAGER_INITIAL_PASSWORD, MEMBER_INITIAL_PASSWORD e CLIENT_INITIAL_PASSWORD em .env.local.");
     process.exit(1);
   }
   console.log(`\nProvisionando ${people.length} usuário(s):\n`);

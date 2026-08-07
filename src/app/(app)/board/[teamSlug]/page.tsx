@@ -21,6 +21,7 @@ export default async function BoardPage({ params }: { params: Promise<{ teamSlug
     },
   });
   if (!team) notFound();
+  if (team.kind === "CLIENT" && user.role === "member") redirect("/kanban");
 
   const flow = team.statuses.map((s) => ({
     id: s.id, key: s.key, label: s.label, order: s.order, tone: s.tone,

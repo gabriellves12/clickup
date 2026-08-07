@@ -18,7 +18,7 @@ function formatDate(iso: string | null) {
   return fmt.format(new Date(iso));
 }
 
-export function ClientsList({ clients, canViewCredentials, canManageLinks }: { clients: ClientRow[]; canViewCredentials: boolean; canManageLinks: boolean }) {
+export function ClientsList({ clients, canViewCredentials, canManageLinks, canViewWhatsapp }: { clients: ClientRow[]; canViewCredentials: boolean; canManageLinks: boolean; canViewWhatsapp: boolean }) {
   const [filters, setFilters] = React.useState<Filters>({ status: "ATIVO", tipos: [], query: "" });
   const [openId, setOpenId] = React.useState<string | null>(null);
   const opened = openId ? clients.find((c) => c.id === openId) ?? null : null;
@@ -170,6 +170,7 @@ export function ClientsList({ clients, canViewCredentials, canManageLinks }: { c
         onOpenChange={(v) => { if (!v) setOpenId(null); }}
         canViewCredentials={canViewCredentials}
         canManageLinks={canManageLinks}
+        canViewWhatsapp={canViewWhatsapp}
       />
     </div>
   );

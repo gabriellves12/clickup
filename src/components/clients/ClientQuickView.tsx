@@ -32,12 +32,14 @@ export function ClientQuickView({
   client, open, onOpenChange,
   canViewCredentials,
   canManageLinks,
+  canViewWhatsapp,
 }: {
   client: ClientRow | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   canViewCredentials: boolean;
   canManageLinks: boolean;
+  canViewWhatsapp: boolean;
 }) {
   const [composerOpen, setComposerOpen] = React.useState(false);
   const router = useRouter();
@@ -179,8 +181,8 @@ export function ClientQuickView({
               )}
             </Field>
 
-            {/* WhatsApp */}
-            <Field label="Grupo do WhatsApp">
+            {/* WhatsApp — restrito à Administração e Gestão */}
+            {canViewWhatsapp && <Field label="Grupo do WhatsApp">
               {client.whatsappUrl ? (
                 <a
                   href={client.whatsappUrl}
@@ -203,7 +205,7 @@ export function ClientQuickView({
               ) : (
                 <span className="text-[12.5px] text-text-3">Sem grupo cadastrado.</span>
               )}
-            </Field>
+            </Field>}
           </div>
         </Dialog.Content>
       </Dialog.Portal>

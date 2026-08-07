@@ -56,6 +56,7 @@ export default async function ClientsPage() {
           clients={clients}
           canViewCredentials={user.role === "admin"}
           canManageLinks={user.role === "admin" || user.role === "manager"}
+          canViewWhatsapp={user.role === "admin" || user.role === "manager"}
         />
       </div>
     </div>
