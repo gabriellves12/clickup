@@ -9,13 +9,17 @@ function todayStart() {
 
 /* ---------------- KPIs globais da tela /clientes ---------------- */
 export async function getClientsOverview() {
-  const [total, ativos, encerrados, fixos, freelas, cards] = await Promise.all([
+  const [total, ativos, encerrados, fixos, freelas, cards, wordpress, figmas, drives, photos] = await Promise.all([
     prisma.client.count(),
     prisma.client.count({ where: { status: "ATIVO" } }),
     prisma.client.count({ where: { status: "ENCERRADO" } }),
     prisma.client.count({ where: { tipoContrato: "FIXO" } }),
     prisma.client.count({ where: { tipoContrato: "FREELA" } }),
     prisma.card.findMany({ select: { status: true, deadline: true, pendenteMaterial: true } }),
+    prisma.linkTreeItem.count({ where: { category: "wordpress" } }),
+    prisma.linkTreeItem.count({ where: { category: "figma" } }),
+    prisma.linkTreeItem.count({ where: { category: "drive" } }),
+    prisma.linkTreeItem.count({ where: { category: "photos" } }),
   ]);
   const t0 = todayStart();
   const abertas = cards.filter((c) => c.status !== DONE_STATUS).length;
@@ -23,7 +27,7 @@ export async function getClientsOverview() {
     c.status !== DONE_STATUS &&
     (c.pendenteMaterial || (c.deadline && c.deadline < t0))
   ).length;
-  return { total, ativos, encerrados, fixos, freelas, abertas, atrasadas };
+  return { total, ativos, encerrados, fixos, freelas, abertas, atrasadas, wordpress, figmas, drives, photos };
 }
 
 /* ---------------- Lista com agregados por cliente ---------------- */

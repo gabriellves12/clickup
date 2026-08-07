@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Avatar, Badge } from "@/components/ui/primitives";
 import { ClientQuickView } from "./ClientQuickView";
+import { CategoryIcon } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import type { ClientRow } from "@/lib/clients-data";
 
@@ -99,70 +100,13 @@ export function ClientsList({ clients, canViewCredentials, canManageLinks, canVi
         </div>
       </div>
 
-      {/* Tabela */}
-      <div className="border border-border rounded-xl overflow-hidden bg-surface">
-        <div className="overflow-x-auto scrollbar-clean">
-          <table className="w-full text-[13px]">
-            <thead>
-              <tr className="text-left text-[10.5px] uppercase tracking-[0.08em] text-text-3 bg-surface-2">
-                <th className="font-medium px-4 py-3">Cliente</th>
-                <th className="font-medium px-3 py-3">Contrato</th>
-                <th className="font-medium px-3 py-3">Status</th>
-                <th className="font-medium px-3 py-3">Responsáveis</th>
-                <th className="font-medium px-3 py-3 text-right tabular">Em aberto</th>
-                <th className="font-medium px-3 py-3 text-right tabular">Atrasadas</th>
-                <th className="font-medium px-4 py-3">Início</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-text-3 text-[12.5px]">
-                    Nenhum cliente para os filtros atuais.
-                  </td>
-                </tr>
-              )}
-              {filtered.map((c) => (
-                <tr
-                  key={c.id}
-                  onClick={() => setOpenId(c.id)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpenId(c.id); } }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Abrir detalhes de ${c.name}`}
-                  className="border-t border-hairline hover:bg-surface-2/60 transition-colors cursor-pointer focus:outline-none focus:bg-surface-2/60"
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <Avatar size="md" initials={c.initials} colorKey="av-5" className="border-0" />
-                      <div>
-                        <div className="text-[13px] font-medium tracking-tight text-text">{c.name}</div>
-                        <div className="text-[10.5px] text-text-3">{c.totalCards} tasks no histórico</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-3 py-3">
-                    <ContratoBadge value={c.tipoContrato} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <StatusBadge value={c.status} />
-                  </td>
-                  <td className="px-3 py-3">
-                    <StackedAvatars people={c.responsibles} />
-                  </td>
-                  <td className="px-3 py-3 text-right tabular text-[13px]">{c.openCount}</td>
-                  <td className="px-3 py-3 text-right tabular text-[13px]">
-                    {c.overdueCount > 0
-                      ? <span className="text-danger font-medium">{c.overdueCount}</span>
-                      : <span className="text-text-3">0</span>}
-                  </td>
-                  <td className="px-4 py-3 text-[12px] text-text-2 tabular">{formatDate(c.startDate)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {filtered.length === 0 ? (
+        <div className="rounded-xl border border-border bg-surface py-14 text-center text-[12.5px] text-text-3">Nenhum cliente para os filtros atuais.</div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((client) => <ClientCard key={client.id} client={client} onOpen={() => setOpenId(client.id)} />)}
         </div>
-      </div>
+      )}
 
       <ClientQuickView
         client={opened}
@@ -173,6 +117,49 @@ export function ClientsList({ clients, canViewCredentials, canManageLinks, canVi
         canViewWhatsapp={canViewWhatsapp}
       />
     </div>
+  );
+}
+
+const resourceSlots = [
+  { category: "figma", label: "Figma" },
+  { category: "drive", label: "Drive" },
+  { category: "photos", label: "Fotos" },
+  { category: "product", label: "Produtos" },
+] as const;
+
+function ClientCard({ client, onOpen }: { client: ClientRow; onOpen: () => void }) {
+  const count = (category: string) => client.links.filter((link) => link.category === category).length;
+  const wordpress = count("wordpress");
+  const otherAccesses = client.links.filter((link) => ["cloudflare", "hosting", "custom"].includes(link.category)).length;
+
+  return (
+    <button type="button" onClick={onOpen} className="group flex min-h-[278px] flex-col rounded-xl border border-border bg-surface p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,.02)] transition-all hover:-translate-y-0.5 hover:border-border-strong hover:shadow-[0_10px_24px_rgba(20,30,48,.08)] focus:outline-none focus:ring-2 focus:ring-text/20">
+      <div className="flex items-start gap-3">
+        <Avatar size="lg" initials={client.initials} colorKey="av-5" className="!size-11 border-0 text-[13px]" />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2"><h2 className="truncate text-[14px] font-semibold tracking-tight text-text">{client.name}</h2><StatusBadge value={client.status} /></div>
+          <div className="mt-1 flex items-center gap-2"><ContratoBadge value={client.tipoContrato} /><span className="text-[9.5px] text-text-3">Desde {formatDate(client.startDate)}</span></div>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-4 gap-1.5">
+        {resourceSlots.map(({ category, label }) => {
+          const total = count(category);
+          return <div key={category} className={cn("rounded-md border px-1.5 py-2", total ? "border-border bg-surface-2 text-text" : "border-hairline bg-surface text-text-3")}><CategoryIcon category={category} className="size-3.5" /><span className="mt-1.5 block text-[9px] font-medium leading-none">{label}</span><span className="mt-1 block text-[10px] font-semibold tabular">{total}</span></div>;
+        })}
+      </div>
+
+      <div className={cn("mt-3 flex items-center gap-2 rounded-lg border px-2.5 py-2", wordpress ? "border-[#d7e3f0] bg-[#f4f8fc] text-[#405d80]" : "border-hairline bg-surface-2/50 text-text-3")}>
+        <span className={cn("grid size-6 place-items-center rounded-md", wordpress ? "bg-[#e3edf7]" : "bg-surface")}><CategoryIcon category="wordpress" className="size-3.5" /></span>
+        <span className="flex-1 text-[10px] font-medium">WordPress</span>
+        <span className="text-[10px] font-semibold tabular">{wordpress ? `${wordpress} acesso${wordpress === 1 ? "" : "s"}` : "Sem acesso"}</span>
+      </div>
+
+      <div className="mt-auto flex items-end justify-between gap-3 pt-4">
+        <div><div className="text-[9px] text-text-3">Responsáveis</div><div className="mt-1"><StackedAvatars people={client.responsibles} /></div></div>
+        <div className="text-right"><span className="block text-[10px] font-semibold tabular text-text">{client.openCount} em aberto</span><span className={cn("mt-1 block text-[9px]", client.overdueCount ? "font-medium text-danger" : "text-text-3")}>{client.overdueCount ? `${client.overdueCount} atrasada${client.overdueCount === 1 ? "" : "s"}` : `${otherAccesses} outros acessos`}</span></div>
+      </div>
+    </button>
   );
 }
 

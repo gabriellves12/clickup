@@ -30,11 +30,13 @@ const DEFAULT_TEAM_COLUMNS = [
 ];
 
 const DEFAULT_CLIENT_COLUMNS = [
-  { key: "PENDENTES",     label: "Pendentes",     tone: "neutral" },
-  { key: "PARA_PRODUCAO", label: "Para produção", tone: "info"    },
-  { key: "EM_PRODUCAO",   label: "Em produção",   tone: "doing"   },
-  { key: "APROVACAO",     label: "Aprovação",     tone: "review"  },
-  { key: "FINALIZADO",    label: "Finalizado",    tone: "done"    },
+  { key: "PENDENTES",          label: "Pendentes",          tone: "neutral" },
+  { key: "LINKS_IMPORTANTES",  label: "Links importantes",  tone: "info"    },
+  { key: "DEMANDAS",           label: "Demandas",           tone: "info"    },
+  { key: "PRODUCAO",           label: "Produção",           tone: "doing"   },
+  { key: "APROVACAO_INTERNA",  label: "Aprovação interna",  tone: "review"  },
+  { key: "ALTERACAO",          label: "Alteração",          tone: "warn"    },
+  { key: "APROVACAO_CLIENTE",  label: "Aprovação cliente",  tone: "review"  },
 ];
 
 // -------- Boards (Team) --------

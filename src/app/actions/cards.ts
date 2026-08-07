@@ -21,6 +21,36 @@ async function statusKeysForTeamSlug(slug: string): Promise<Set<string>> {
   return new Set(team?.statuses.map((s) => s.key) ?? []);
 }
 
+// Move um card para o board Web (implementação): novo teamId, primeira etapa,
+// assigna ao primeiro membro do Web (hoje João Victor). Preserva deadline.
+async function migrateCardToWeb(cardId: string): Promise<void> {
+  const webSlug = await getWebRoutingTeamSlug();
+  const webTeam = await prisma.team.findUnique({
+    where: { slug: webSlug },
+    include: {
+      statuses: { orderBy: { order: "asc" }, take: 1, select: { key: true } },
+      members: { orderBy: { order: "asc" }, take: 1, select: { personId: true } },
+    },
+  });
+  if (!webTeam) return;
+  const firstStatus = webTeam.statuses[0]?.key ?? "EM_PRODUCAO";
+  const firstMember = webTeam.members[0]?.personId;
+  if (!firstMember) return; // sem ninguém no Web, aborta a migração
+  const max = await prisma.card.aggregate({
+    where: { teamId: webTeam.id, status: firstStatus },
+    _max: { order: true },
+  });
+  await prisma.card.update({
+    where: { id: cardId },
+    data: {
+      teamId: webTeam.id,
+      status: firstStatus,
+      responsibleId: firstMember,
+      order: (max._max.order ?? 0) + 1000,
+    },
+  });
+}
+
 type CardInput = {
   id?: string;
   title: string;
@@ -200,6 +230,20 @@ export async function moveCard(params: {
       order: newOrder,
     },
   });
+
+  // Auto-move: card de PAGINA que chega em FINALIZADO no board interno de
+  // design migra pro board Web (implementação). Assigna ao único membro Web.
+  if (
+    !isPersonColumn &&
+    params.toStatus === "FINALIZADO" &&
+    card.tipoProjeto === "PAGINA" &&
+    card.team.slug !== await getWebRoutingTeamSlug()
+  ) {
+    await migrateCardToWeb(card.id);
+    // Precisamos revalidar aqui porque o card some do board atual.
+    revalidatePath(`/board/${card.team.slug}`);
+    revalidatePath(`/board/${await getWebRoutingTeamSlug()}`);
+  }
 
   // Intencionalmente SEM revalidatePath: o cliente ja atualiza o estado
   // otimista com o novo status/responsavel/ordem. Chamar revalidate aqui

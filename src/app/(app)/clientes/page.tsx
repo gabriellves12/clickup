@@ -44,12 +44,15 @@ export default async function ClientsPage() {
 
       <div className="px-6 lg:px-8 pb-6 grid gap-6">
         {/* KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-3">
           <KpiCard label="Total" value={overview.total} />
           <KpiCard label="Ativos" value={overview.ativos} />
           <KpiCard label="Fixos" value={overview.fixos} />
           <KpiCard label="Freelas" value={overview.freelas} />
           <KpiCard label="Encerrados" value={overview.encerrados} hint="Parceria finalizada" />
+          <KpiCard label="WordPress" value={overview.wordpress} hint="Acessos mapeados" />
+          <KpiCard label="Figmas" value={overview.figmas} hint="Arquivos ativos" />
+          <KpiCard label="Materiais" value={overview.drives + overview.photos} hint="Drives e fotos" />
         </div>
 
         <ClientsList
