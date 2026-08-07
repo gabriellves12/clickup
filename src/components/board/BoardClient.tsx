@@ -13,6 +13,7 @@ import { TaskCard } from "./TaskCard";
 import { EditableBoardTitle } from "./EditableBoardTitle";
 import { ColumnHeader } from "./ColumnHeader";
 import { AddColumnButton } from "./AddColumnButton";
+import { BoardFilters, emptyFilters, matchesDate, type BoardFiltersState } from "./BoardFilters";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import { IcAlert, IcPlus } from "@/components/icons";
 import { cn } from "@/lib/cn";
@@ -25,9 +26,55 @@ const parseCell = (id: string) => {
   return { statusKey, personId };
 };
 
-export function BoardClient({ data, canManage }: { data: BoardData; canManage: boolean }) {
+export function BoardClient({
+  data, canManage, currentUserId,
+}: { data: BoardData; canManage: boolean; currentUserId: string }) {
   const [cards, setCards] = React.useState<CardLite[]>(data.cards);
   React.useEffect(() => setCards(data.cards), [data.cards]);
+
+  const [filters, setFilters] = React.useState<BoardFiltersState>(emptyFilters);
+  const currentUserIsResponsible = React.useMemo(
+    () => cards.some((c) => c.responsibleId === currentUserId),
+    [cards, currentUserId],
+  );
+
+  const todayStart = React.useMemo(() => {
+    const t = new Date(); t.setHours(0, 0, 0, 0); return t;
+  }, []);
+
+  // Aplica filtros combinados. "Somente eu" força personIds = [currentUserId] visual/lógica.
+  const effectivePersonIds = React.useMemo(() => {
+    if (filters.onlyMe) return new Set([currentUserId]);
+    if (filters.personIds.length) return new Set(filters.personIds);
+    return null;
+  }, [filters.onlyMe, filters.personIds, currentUserId]);
+
+  const effectiveStatusKeys = React.useMemo(() => (
+    filters.statusKeys.length ? new Set(filters.statusKeys) : null
+  ), [filters.statusKeys]);
+
+  const filteredCards = React.useMemo(() => {
+    return cards.filter((c) => {
+      if (effectivePersonIds && !effectivePersonIds.has(c.responsibleId)) return false;
+      if (effectiveStatusKeys && !effectiveStatusKeys.has(c.status)) return false;
+      if (!matchesDate(c.deadline, filters.date, todayStart)) return false;
+      return true;
+    });
+  }, [cards, effectivePersonIds, effectiveStatusKeys, filters.date, todayStart]);
+
+  // Membros visíveis: quando "Somente eu" está ativo, só a raia do usuário logado.
+  // Quando "Pessoa" tem seleção, só as raias selecionadas.
+  const visibleMembers = React.useMemo(() => {
+    if (filters.onlyMe) {
+      const mine = data.members.find((m) => m.person.id === currentUserId);
+      return mine ? [mine] : [];
+    }
+    if (filters.personIds.length) {
+      const set = new Set(filters.personIds);
+      return data.members.filter((m) => set.has(m.person.id));
+    }
+    return data.members;
+  }, [data.members, filters.onlyMe, filters.personIds, currentUserId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -54,25 +101,25 @@ export function BoardClient({ data, canManage }: { data: BoardData; canManage: b
       .sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? ""));
   }, [cards]);
 
-  // Cards por (pessoa, status) — matriz. Map key = cellKey(statusKey, personId).
+  // Cards por (pessoa, status) — matriz, respeitando filtros.
   const cardsByCell = React.useMemo(() => {
     const map = new Map<string, CardLite[]>();
-    for (const p of data.members)
+    for (const p of visibleMembers)
       for (const s of data.flow) map.set(cellKey(s.key, p.person.id), []);
-    for (const c of cards) {
+    for (const c of filteredCards) {
       const k = cellKey(c.status, c.responsibleId);
       if (!map.has(k)) map.set(k, []);
       map.get(k)!.push(c);
     }
     for (const [, arr] of map) arr.sort((a, b) => a.order - b.order);
     return map;
-  }, [cards, data.members, data.flow]);
+  }, [filteredCards, visibleMembers, data.flow]);
 
   const countsByStatus = React.useMemo(() => {
     const map = new Map<string, number>();
-    for (const c of cards) map.set(c.status, (map.get(c.status) ?? 0) + 1);
+    for (const c of filteredCards) map.set(c.status, (map.get(c.status) ?? 0) + 1);
     return map;
-  }, [cards]);
+  }, [filteredCards]);
 
   const activeCard = activeId ? cards.find((c) => c.id === activeId) : null;
 
@@ -156,7 +203,6 @@ export function BoardClient({ data, canManage }: { data: BoardData; canManage: b
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="secondary" size="md" disabled>Filtros</Button>
           {canManage && (
             <Button variant="primary" size="md" onClick={() => setCreating({ open: true })}>
               <IcPlus className="size-3.5" /> Nova demanda
@@ -164,6 +210,17 @@ export function BoardClient({ data, canManage }: { data: BoardData; canManage: b
           )}
         </div>
       </div>
+
+      {/* Filtros */}
+      <BoardFilters
+        filters={filters}
+        onChange={setFilters}
+        people={data.members.map((m) => m.person)}
+        flow={flow}
+        matchedCount={filteredCards.length}
+        totalCount={cards.length}
+        currentUserIsResponsible={currentUserIsResponsible}
+      />
 
       {/* Corpo */}
       <div className="p-4 flex-1 min-h-0 overflow-hidden bg-[#fafafa]">
@@ -205,7 +262,7 @@ export function BoardClient({ data, canManage }: { data: BoardData; canManage: b
                 </div>
 
                 {/* Rows */}
-                {data.members.map(({ person }) => (
+                {visibleMembers.map(({ person }) => (
                   <div key={person.id} className="flex border-b border-[#eee] last:border-b-0">
                     <div className="w-[160px] shrink-0 px-4 py-3 flex items-center gap-2 border-r border-[#eee] bg-[#fafafa] sticky left-0 z-[1]">
                       <Avatar size="sm" initials={person.initials} colorKey={person.color} className="border-0" />
@@ -228,9 +285,11 @@ export function BoardClient({ data, canManage }: { data: BoardData; canManage: b
                   </div>
                 ))}
 
-                {data.members.length === 0 && (
+                {visibleMembers.length === 0 && (
                   <div className="p-10 text-center text-[11px] text-text-3">
-                    Nenhuma pessoa vinculada a este quadro ainda.
+                    {data.members.length === 0
+                      ? "Nenhuma pessoa vinculada a este quadro ainda."
+                      : "Nenhuma raia visível para os filtros atuais."}
                   </div>
                 )}
               </div>
