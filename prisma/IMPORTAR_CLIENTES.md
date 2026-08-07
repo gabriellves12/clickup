@@ -14,13 +14,13 @@ Usuários e senhas de acessos técnicos presentes no HTML são importados para o
 ## Validar o arquivo sem alterar o banco
 
 ```bash
-npm run clients:import -- ../central-de-clientes-nevel.html --dry-run
+npm run clients:import -- "../central-de-clientes-nevel (1).html" --dry-run
 ```
 
 ## Executar a importação
 
 ```bash
-npm run clients:import -- ../central-de-clientes-nevel.html
+npm run clients:import -- "../central-de-clientes-nevel (1).html"
 ```
 
 A operação é transacional: todos os clientes são importados juntos ou nenhuma alteração é aplicada. O importador só substitui a árvore de links dos clientes presentes na central e preserva produtos já associados a tarefas.

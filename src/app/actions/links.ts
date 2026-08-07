@@ -13,7 +13,7 @@ export async function createLinkItem(input: {
   username?: string;
   secret?: string;
   parentId?: string | null;
-  currentTeamSlug: string;
+  currentTeamSlug?: string;
 }) {
   await requireOperationalManager();
   let tree = await prisma.linkTree.findUnique({ where: { clientId: input.clientId } });
@@ -37,7 +37,8 @@ export async function createLinkItem(input: {
       order: (max._max.order ?? -1) + 1,
     },
   });
-  revalidatePath(`/board/${input.currentTeamSlug}`);
+  revalidatePath("/clientes");
+  if (input.currentTeamSlug) revalidatePath(`/board/${input.currentTeamSlug}`);
 }
 
 export async function updateLinkItem(input: {
@@ -48,7 +49,7 @@ export async function updateLinkItem(input: {
   username?: string | null;
   secret?: string | null;
   category?: string;
-  currentTeamSlug: string;
+  currentTeamSlug?: string;
 }) {
   await requireOperationalManager();
   await prisma.linkTreeItem.update({
@@ -62,11 +63,13 @@ export async function updateLinkItem(input: {
       category: input.category,
     },
   });
-  revalidatePath(`/board/${input.currentTeamSlug}`);
+  revalidatePath("/clientes");
+  if (input.currentTeamSlug) revalidatePath(`/board/${input.currentTeamSlug}`);
 }
 
-export async function deleteLinkItem(id: string, currentTeamSlug: string) {
+export async function deleteLinkItem(id: string, currentTeamSlug?: string) {
   await requireOperationalManager();
   await prisma.linkTreeItem.delete({ where: { id } });
-  revalidatePath(`/board/${currentTeamSlug}`);
+  revalidatePath("/clientes");
+  if (currentTeamSlug) revalidatePath(`/board/${currentTeamSlug}`);
 }

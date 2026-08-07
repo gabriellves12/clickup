@@ -9,6 +9,8 @@ import { CategoryIcon, IcAlert, IcChevronDown, IcClose, IcExternal, IcPlus, IcTr
 import { createOrUpdateCard, deleteCard } from "@/app/actions/cards";
 import { addComment, deleteComment, listComments, type CommentLite } from "@/app/actions/comments";
 import { createClientQuick, createProductQuick } from "@/app/actions/catalog";
+import { colorForClient, colorForPriority, colorForStage } from "@/lib/kanban-colors";
+import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { CardLite, ClientWithLinks, DemandTypeLite, PersonLite, ProductLite } from "@/components/board/types";
 import { PERSON_COLUMN_STATUS, type StatusDef } from "@/lib/board-config";
@@ -193,8 +195,37 @@ export function CardDialog({
                     className="h-auto w-full border-0 px-0 py-1 text-[22px] font-semibold tracking-[-.025em] shadow-none focus:ring-0"
                   />
 
-                  {/* Info block: Status | Responsável | Etiqueta | Data de entrega */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg border border-border bg-surface-2 p-3">
+                  {/* Badges de resumo — coloridos */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {(() => {
+                      const idx = destFlow.findIndex((s) => s.key === form.status);
+                      const isPersonCol = form.status === PERSON_COLUMN_STATUS;
+                      const stageColor = isPersonCol
+                        ? { badgeBg: "#eaf2ff", badgeText: "#1d3d7a" }
+                        : colorForStage(idx, destFlow[idx]?.tone ?? null);
+                      const stageLabel = isPersonCol ? "Coluna da pessoa" : (destFlow[idx]?.label ?? form.status);
+                      return (
+                        <BadgePill bg={stageColor.badgeBg} text={stageColor.badgeText}>{stageLabel}</BadgePill>
+                      );
+                    })()}
+                    {form.clientId && (() => {
+                      const c = localClients.find((x) => x.id === form.clientId);
+                      const cc = colorForClient(form.clientId);
+                      return c ? <BadgePill bg={cc.bg} text={cc.text}>{c.name}</BadgePill> : null;
+                    })()}
+                    {form.priority && form.priority !== "NORMAL" && (() => {
+                      const pc = colorForPriority(form.priority);
+                      return <BadgePill bg={pc.bg} text={pc.text}>{pc.label}</BadgePill>;
+                    })()}
+                    {form.deadline && (
+                      <BadgePill bg="#eef2ff" text="#3730a3">
+                        {new Date(`${form.deadline}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}
+                      </BadgePill>
+                    )}
+                  </div>
+
+                  {/* Info block: Status | Responsável | Etiqueta | Data de entrega | Prioridade */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 rounded-lg border border-border bg-surface-2 p-3">
                     <InfoField label="Status">
                       <Select value={form.status} onChange={(event) => set("status", event.target.value)} className="h-8 text-[12px]">
                         <option value={PERSON_COLUMN_STATUS}>Coluna da pessoa</option>
@@ -214,6 +245,17 @@ export function CardDialog({
                     <InfoField label="Data de entrega">
                       <Input type="date" value={form.deadline} onChange={(event) => set("deadline", event.target.value)} className="h-8 text-[12px]" />
                     </InfoField>
+                    <InfoField label="Prioridade">
+                      <Select value={form.priority} onChange={(event) => set("priority", event.target.value)} className="h-8 text-[12px]">
+                        {priorities.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                      </Select>
+                    </InfoField>
+                    <InfoField label="Produto">
+                      <Select value={form.productId} onChange={(event) => updateDefinition({ productId: event.target.value })} className="h-8 text-[12px]">
+                        <option value="">—</option>
+                        {clientProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </Select>
+                    </InfoField>
                   </div>
 
                   {/* Briefing */}
@@ -227,15 +269,36 @@ export function CardDialog({
                     />
                   </ContentBlock>
 
-                  {/* Copy + Link do Drive */}
+                  {/* Copy + Link do Drive + Referência */}
                   <div className="grid gap-3 sm:grid-cols-2">
                     <ContentBlock title="Copy">
-                      <Input type="url" value={form.copyUrl} onChange={(event) => set("copyUrl", event.target.value)} placeholder="Cole o link enviado pelo cliente" className="h-9" />
+                      <LinkableInput
+                        value={form.copyUrl}
+                        onChange={(v) => set("copyUrl", v)}
+                        placeholder="Cole o link enviado pelo cliente"
+                        variant="link"
+                      />
                     </ContentBlock>
                     <ContentBlock title="Link do Drive">
-                      <Input type="url" value={form.attachmentDriveUrl} onChange={(event) => set("attachmentDriveUrl", event.target.value)} placeholder={product?.driveUrl ?? "https://drive.google.com/…"} className="h-9" />
+                      <LinkableInput
+                        value={form.attachmentDriveUrl}
+                        onChange={(v) => set("attachmentDriveUrl", v)}
+                        placeholder={product?.driveUrl ?? "https://drive.google.com/…"}
+                        variant="link"
+                      />
                     </ContentBlock>
                   </div>
+
+                  {/* Referência (livre) */}
+                  <ContentBlock title="Referência">
+                    <Textarea
+                      rows={3}
+                      value={form.referenceUrl}
+                      onChange={(event) => set("referenceUrl", event.target.value)}
+                      placeholder="Link, descrição, observação… o que for referência para a entrega"
+                      className="text-[12px] leading-5"
+                    />
+                  </ContentBlock>
 
                   {/* Central de Links */}
                   <ContentBlock title="Central de Links">
@@ -368,6 +431,45 @@ function TaskSheetRow({ icon, label, children }: { icon: string; label: string; 
 }
 
 /* ------------------------- Info / Content / Central de Links ------------------------- */
+
+function BadgePill({ bg, text, children }: { bg: string; text: string; children: React.ReactNode }) {
+  return (
+    <span
+      className="inline-flex items-center h-5 px-2 rounded-full text-[9.5px] font-semibold uppercase tracking-[.04em]"
+      style={{ backgroundColor: bg, color: text }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function LinkableInput({
+  value, onChange, placeholder, variant,
+}: { value: string; onChange: (v: string) => void; placeholder?: string; variant: "link" }) {
+  const hasLink = value.trim().length > 0 && /^https?:\/\//i.test(value.trim());
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        type="text"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-9 flex-1"
+      />
+      {hasLink && variant === "link" && (
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 h-9 px-2.5 rounded-md border border-border bg-white text-[11px] font-medium text-text hover:bg-surface-2 no-underline hover:no-underline shrink-0"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          Abrir <ExternalLink className="size-3" />
+        </a>
+      )}
+    </div>
+  );
+}
 
 function InfoField({ label, children }: { label: string; children: React.ReactNode }) {
   return (

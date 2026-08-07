@@ -11,6 +11,7 @@ import { useTransition } from "react";
 import { AlertTriangle, Lock, Search, X } from "lucide-react";
 import { moveCard } from "@/app/actions/cards";
 import { PERSON_COLUMN_STATUS } from "@/lib/board-config";
+import { PERSON_COLUMN_COLOR, colorForStage, type StageColor } from "@/lib/kanban-colors";
 import { TaskCard } from "./TaskCard";
 import { EditableBoardTitle } from "./EditableBoardTitle";
 import { ColumnHeader } from "./ColumnHeader";
@@ -321,12 +322,15 @@ export function BoardClient({
 
               {columns.map((col) => {
                 const list = cardsByColumn.get(col.id) ?? [];
+                const color = col.kind === "person"
+                  ? PERSON_COLUMN_COLOR
+                  : colorForStage(flow.findIndex((s) => s.key === col.stage.key), col.stage.tone);
                 return (
                   <BoardColumnView
                     key={col.id}
                     column={col}
                     cards={list}
-                    stageMap={stageMap}
+                    color={color}
                     onOpen={setOpenCardId}
                     onAdd={canManage ? () => setCreating({
                       open: true,
@@ -353,8 +357,6 @@ export function BoardClient({
                 <div className="rotate-1">
                   <TaskCard
                     card={activeCard}
-                    stageLabel={stageMap.get(activeCard.status)?.label}
-                    stageTone={stageMap.get(activeCard.status)?.tone}
                     onOpen={() => {}}
                   />
                 </div>
@@ -388,11 +390,11 @@ export function BoardClient({
 /* ------------------------- Board column ------------------------- */
 
 function BoardColumnView({
-  column, cards, stageMap, onOpen, onAdd, canEdit, boardTeamId, stageNeighbors, restrictedForCurrentUser,
+  column, cards, color, onOpen, onAdd, canEdit, boardTeamId, stageNeighbors, restrictedForCurrentUser,
 }: {
   column: BoardColumn;
   cards: CardLite[];
-  stageMap: Map<string, FlowColumnDef>;
+  color: StageColor;
   onOpen: (id: string) => void;
   onAdd?: () => void;
   canEdit: boolean;
@@ -407,13 +409,18 @@ function BoardColumnView({
   return (
     <section
       className={cn(
-        "w-[268px] shrink-0 bg-white border border-[#e7e7e7] rounded-lg overflow-hidden flex flex-col transition-colors duration-100",
-        isOver && !restrictedForCurrentUser && "outline outline-1 outline-accent/50 outline-offset-[-1px] bg-accent/5",
+        "w-[268px] shrink-0 rounded-lg overflow-hidden flex flex-col transition-colors duration-100 border",
+        isOver && !restrictedForCurrentUser && "outline outline-2 outline-offset-[-1px]",
         restrictedForCurrentUser && "opacity-85",
       )}
+      style={{
+        backgroundColor: color.columnBg,
+        borderColor: color.border,
+        outlineColor: isOver && !restrictedForCurrentUser ? color.dot : undefined,
+      }}
     >
       {column.kind === "person" ? (
-        <PersonColumnHeader person={column.person} count={cards.length} />
+        <PersonColumnHeader person={column.person} count={cards.length} color={color} />
       ) : (
         <ColumnHeader
           id={column.stage.id}
@@ -424,6 +431,7 @@ function BoardColumnView({
           neighbors={stageNeighbors ?? { prev: null, prevPrev: null, next: null, nextNext: null }}
           restrictToManagers={column.stage.restrictToManagers}
           teamId={boardTeamId}
+          color={color}
         />
       )}
 
@@ -434,8 +442,6 @@ function BoardColumnView({
               key={c.id}
               card={c}
               isDone={c.status === "FINALIZADO"}
-              stageLabel={stageMap.get(c.status)?.label}
-              stageTone={stageMap.get(c.status)?.tone}
               onOpen={onOpen}
             />
           ))}
@@ -464,14 +470,23 @@ function BoardColumnView({
   );
 }
 
-function PersonColumnHeader({ person, count }: { person: PersonLite; count: number }) {
+function PersonColumnHeader({ person, count, color }: { person: PersonLite; count: number; color: StageColor }) {
   return (
-    <header className="h-11 shrink-0 px-3 flex items-center gap-2 border-b border-[#e8e8e8] bg-[#fafafa]">
+    <header
+      className="h-11 shrink-0 px-3 flex items-center gap-2 border-b"
+      style={{ backgroundColor: color.headerBg, borderBottomColor: color.border }}
+    >
       <Avatar size="sm" initials={person.initials} colorKey={person.color} className="border-0" />
-      <span className="text-[10.5px] font-semibold uppercase tracking-[.055em] text-[#333] truncate flex-1">
+      <span
+        className="text-[10.5px] font-semibold uppercase tracking-[.055em] truncate flex-1"
+        style={{ color: color.headerText }}
+      >
         {person.name}
       </span>
-      <span className="min-w-5 h-5 px-1.5 rounded bg-[#e9e9e9] grid place-items-center text-[9.5px] tabular text-[#666]">
+      <span
+        className="min-w-5 h-5 px-1.5 rounded grid place-items-center text-[9.5px] tabular"
+        style={{ backgroundColor: "white", color: color.headerText, border: `1px solid ${color.border}` }}
+      >
         {count}
       </span>
     </header>

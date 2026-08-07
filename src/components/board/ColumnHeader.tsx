@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Lock, MoreHorizontal, Pencil, Trash2, Unlock
 import { useTransition } from "react";
 import { cn } from "@/lib/cn";
 import { deleteColumn, renameColumn, reorderColumn, setColumnRestriction } from "@/app/actions/boards";
+import type { StageColor } from "@/lib/kanban-colors";
 
 type Neighbor = { id: string; order: number } | null;
 
@@ -23,9 +24,10 @@ type Props = {
   };
   restrictToManagers?: boolean;
   teamId?: string;
+  color?: StageColor;
 };
 
-export function ColumnHeader({ id, label, count, tone, canEdit, neighbors, restrictToManagers = false, teamId: _teamId }: Props) {
+export function ColumnHeader({ id, label, count, tone, canEdit, neighbors, restrictToManagers = false, teamId: _teamId, color }: Props) {
   const [editing, setEditing] = React.useState(false);
   const [value, setValue] = React.useState(label);
   const [pending, startTransition] = useTransition();
@@ -82,10 +84,17 @@ export function ColumnHeader({ id, label, count, tone, canEdit, neighbors, restr
   }
 
   return (
-    <header className="group h-11 shrink-0 px-3 flex items-center gap-2 border-b border-[#e8e8e8] bg-[#fafafa]">
-      <span className={cn("size-2 rounded-full shrink-0", toneColor.dot)} aria-hidden />
+    <header
+      className="group h-11 shrink-0 px-3 flex items-center gap-2 border-b"
+      style={color ? { backgroundColor: color.headerBg, borderBottomColor: color.border } : undefined}
+    >
+      {color ? (
+        <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: color.dot }} aria-hidden />
+      ) : (
+        <span className={cn("size-2 rounded-full shrink-0", toneColor.dot)} aria-hidden />
+      )}
       {restrictToManagers && (
-        <Lock className="size-3 text-[#a09990]" aria-label="Somente gestão" />
+        <Lock className="size-3" style={color ? { color: color.headerText } : undefined} aria-label="Somente gestão" />
       )}
       {editing ? (
         <input
@@ -106,14 +115,20 @@ export function ColumnHeader({ id, label, count, tone, canEdit, neighbors, restr
           onClick={() => canEdit && setEditing(true)}
           disabled={!canEdit}
           className={cn(
-            "text-left text-[10.5px] font-semibold uppercase tracking-[.055em] text-[#333] truncate flex-1",
-            canEdit && "hover:text-[#111] cursor-text",
+            "text-left text-[10.5px] font-semibold uppercase tracking-[.055em] truncate flex-1",
+            canEdit && "cursor-text",
           )}
+          style={color ? { color: color.headerText } : undefined}
         >
           {label}
         </button>
       )}
-      <span className="min-w-5 h-5 px-1.5 rounded bg-[#e9e9e9] grid place-items-center text-[9.5px] tabular text-[#666]">
+      <span
+        className="min-w-5 h-5 px-1.5 rounded grid place-items-center text-[9.5px] tabular"
+        style={color ? {
+          backgroundColor: "white", color: color.headerText, border: `1px solid ${color.border}`,
+        } : { backgroundColor: "#e9e9e9", color: "#666" }}
+      >
         {count}
       </span>
       {canEdit && !editing && (

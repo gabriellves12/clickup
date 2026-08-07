@@ -52,7 +52,11 @@ export default async function ClientsPage() {
           <KpiCard label="Encerrados" value={overview.encerrados} hint="Parceria finalizada" />
         </div>
 
-        <ClientsList clients={clients} canViewCredentials={user.role === "admin"} />
+        <ClientsList
+          clients={clients}
+          canViewCredentials={user.role === "admin"}
+          canManageLinks={user.role === "admin" || user.role === "manager"}
+        />
       </div>
     </div>
   );

@@ -3,10 +3,12 @@
 import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Check, Copy, Eye, EyeOff, LockKeyhole } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Avatar, IconButton } from "@/components/ui/primitives";
 import { CategoryIcon, IcClose, IcExternal } from "@/components/icons";
 import { cn } from "@/lib/cn";
 import type { ClientRow } from "@/lib/clients-data";
+import { createLinkItem } from "@/app/actions/links";
 
 const fmtMonth = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" });
 
@@ -29,12 +31,16 @@ const WHATSAPP_GREEN = "#25D366";
 export function ClientQuickView({
   client, open, onOpenChange,
   canViewCredentials,
+  canManageLinks,
 }: {
   client: ClientRow | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
   canViewCredentials: boolean;
+  canManageLinks: boolean;
 }) {
+  const [composerOpen, setComposerOpen] = React.useState(false);
+  const router = useRouter();
   if (!client) return null;
 
   const now = new Date();
@@ -157,6 +163,7 @@ export function ClientQuickView({
                   ))}
                 </div>
               )}
+              {canManageLinks && <button type="button" onClick={() => setComposerOpen(true)} className="mt-2 flex min-h-12 w-full items-center gap-2 rounded-lg border border-dashed border-border-strong px-3 text-left text-[10px] font-medium text-text-2 transition-colors hover:border-text-3 hover:bg-surface-2 hover:text-text"><span className="grid size-6 place-items-center rounded-md bg-surface-2 text-[15px] leading-none">+</span><span>Adicionar foto, Figma, Drive, produto ou acesso</span></button>}
             </Field>
 
             {/* Acesso */}
@@ -200,6 +207,13 @@ export function ClientQuickView({
           </div>
         </Dialog.Content>
       </Dialog.Portal>
+      <LinkComposer
+        open={composerOpen}
+        clientId={client.id}
+        clientName={client.name}
+        onOpenChange={setComposerOpen}
+        onCreated={() => router.refresh()}
+      />
     </Dialog.Root>
   );
 }
@@ -315,6 +329,32 @@ function CredentialField({ label, value, secret = false }: { label: string; valu
     window.setTimeout(() => setCopied(false), 1400);
   }
   return <div className="rounded-md border border-[#dce3ec] bg-white px-2 py-1.5"><div className="mb-1 flex items-center justify-between"><span className="text-[8px] font-semibold uppercase tracking-[.11em] text-text-3">{label}</span><div className="flex items-center gap-1">{secret && <button type="button" onClick={() => setRevealed((current) => !current)} className="grid size-4 place-items-center text-text-3 hover:text-text" aria-label={revealed ? "Ocultar senha" : "Exibir senha"}>{revealed ? <EyeOff className="size-3" /> : <Eye className="size-3" />}</button>}<button type="button" onClick={() => void copyValue()} className="grid size-4 place-items-center text-text-3 hover:text-text" aria-label={`Copiar ${label}`}>{copied ? <Check className="size-3 text-[#418164]" /> : <Copy className="size-3" />}</button></div></div><span className="block truncate font-mono text-[9.5px] text-text">{secret && !revealed ? "••••••••••••" : value}</span></div>;
+}
+
+type NewLinkCategory = "drive" | "figma" | "photos" | "product" | "wordpress" | "cloudflare" | "hosting" | "custom";
+type NewLinkForm = { category: NewLinkCategory; label: string; url: string; observation: string; username: string; secret: string };
+
+function LinkComposer({ open, clientId, clientName, onOpenChange, onCreated }: { open: boolean; clientId: string; clientName: string; onOpenChange: (open: boolean) => void; onCreated: () => void }) {
+  const [form, setForm] = React.useState<NewLinkForm>({ category: "figma", label: "", url: "", observation: "", username: "", secret: "" });
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, startTransition] = React.useTransition();
+  const isAccess = ["wordpress", "cloudflare", "hosting", "custom"].includes(form.category);
+  function update<K extends keyof NewLinkForm>(key: K, value: NewLinkForm[K]) { setForm((current) => ({ ...current, [key]: value })); }
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!form.label.trim()) { setError("Informe o nome deste item."); return; }
+    setError(null);
+    startTransition(async () => {
+      try {
+        await createLinkItem({ clientId, category: form.category, label: form.label, url: form.url, observation: form.observation, username: form.username, secret: form.secret });
+        setForm({ category: "figma", label: "", url: "", observation: "", username: "", secret: "" });
+        onOpenChange(false); onCreated();
+      } catch {
+        setError("Não foi possível adicionar o item. Verifique sua permissão e tente novamente.");
+      }
+    });
+  }
+  return <Dialog.Root open={open} onOpenChange={onOpenChange}><Dialog.Portal><Dialog.Overlay className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]" /><Dialog.Content className="fixed left-1/2 top-1/2 z-[61] w-[min(460px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-surface p-5 shadow-e5 outline-none"><Dialog.Title className="text-[17px] font-semibold tracking-[-.03em]">Adicionar ao cliente</Dialog.Title><Dialog.Description className="mt-1 text-[10.5px] text-text-3">Novo material para <b className="font-medium text-text-2">{clientName}</b>.</Dialog.Description><form className="mt-5 grid gap-3" onSubmit={submit}><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Tipo de item<select value={form.category} onChange={(event) => update("category", event.target.value as NewLinkCategory)} className="field"><option value="figma">Figma</option><option value="drive">Drive</option><option value="photos">Fotos</option><option value="product">Produto</option><option value="wordpress">WordPress</option><option value="cloudflare">Cloudflare</option><option value="hosting">Hospedagem</option><option value="custom">Outro acesso</option></select></label><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Nome<input value={form.label} onChange={(event) => update("label", event.target.value)} placeholder={isAccess ? "Ex.: WordPress — site institucional" : "Ex.: Pasta de fotos atualizadas"} className="field" /></label><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Link<input value={form.url} onChange={(event) => update("url", event.target.value)} type="url" placeholder="https://" className="field" /></label><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Observação<input value={form.observation} onChange={(event) => update("observation", event.target.value)} placeholder="Contexto ou instrução de uso (opcional)" className="field" /></label>{isAccess && <div className="grid grid-cols-2 gap-3 rounded-lg border border-[#dce5f0] bg-[#f5f8fc] p-3"><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Usuário<input value={form.username} onChange={(event) => update("username", event.target.value)} placeholder="Opcional" className="field !h-8" /></label><label className="grid gap-1.5 text-[10px] font-medium text-text-2">Senha<input value={form.secret} onChange={(event) => update("secret", event.target.value)} placeholder="Opcional" className="field !h-8" /></label><p className="col-span-2 text-[9px] leading-3.5 text-text-3">Credenciais ficam disponíveis somente para administradores.</p></div>}{error && <p className="text-[10px] text-danger">{error}</p>}<div className="mt-2 flex justify-end gap-2"><Dialog.Close asChild><button type="button" className="h-8 rounded-md px-3 text-[10.5px] text-text-2 hover:bg-surface-2">Cancelar</button></Dialog.Close><button type="submit" disabled={pending} className="h-8 rounded-md bg-text px-3 text-[10.5px] font-medium text-bg disabled:opacity-50">{pending ? "Adicionando…" : "Adicionar item"}</button></div></form></Dialog.Content></Dialog.Portal></Dialog.Root>;
 }
 
 function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1); }
