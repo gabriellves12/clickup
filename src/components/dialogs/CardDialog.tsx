@@ -173,7 +173,10 @@ export function CardDialog({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[3px] data-[state=open]:animate-[overlayShow_150ms_ease-out]" />
-        <Dialog.Content className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(760px,calc(100vw-24px))] max-h-[min(88vh,900px)] rounded-xl bg-bg border border-border shadow-e5 flex flex-col outline-none data-[state=open]:animate-[contentShow_180ms_cubic-bezier(.2,0,0,1)]">
+        <Dialog.Content className={cn(
+          "fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[min(88vh,900px)] rounded-xl bg-bg border border-border shadow-e5 flex flex-col outline-none data-[state=open]:animate-[contentShow_180ms_cubic-bezier(.2,0,0,1)]",
+          editing ? "w-[min(1160px,calc(100vw-24px))]" : "w-[min(760px,calc(100vw-24px))]",
+        )}>
           <header className="h-[78px] shrink-0 flex items-center justify-between gap-4 px-7 bg-surface border-b border-border">
             <div>
               <span className="text-[10px] font-semibold tracking-[.18em] text-text-3 uppercase">{readOnly ? "Visualização" : editing ? "Editar entrega" : "Nova entrega"}</span>
@@ -184,7 +187,8 @@ export function CardDialog({
           </header>
 
           <form onSubmit={handleSubmit} className="contents">
-            <div className="flex-1 overflow-y-auto scrollbar-clean flex flex-col">
+            <div className={cn("flex-1 min-h-0 flex overflow-hidden", editing ? "md:flex-row flex-col" : "flex-col")}>
+            <div className="flex-1 min-h-0 overflow-y-auto scrollbar-clean">
             <fieldset disabled={readOnly} className="p-5 grid gap-4 disabled:opacity-100">
               {editing && (
                 <div className="grid gap-5">
@@ -379,20 +383,26 @@ export function CardDialog({
               </Section>
               </>}
             </fieldset>
+            </div>
 
             {editing && (
-              <section className="border-t border-border bg-surface-2 p-5">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[.08em] text-text-2">Comentários</h3>
-                <CommentsThread
-                  cardId={editing.id}
-                  comments={comments}
-                  loaded={commentsLoaded}
-                  canDelete={!readOnly}
-                  currentTeamSlug={currentTeamSlug}
-                  onAdded={(c) => setComments((prev) => [...prev, c])}
-                  onDeleted={(id) => setComments((prev) => prev.filter((c) => c.id !== id))}
-                />
-              </section>
+              <aside className="shrink-0 md:w-[380px] md:border-l md:border-t-0 border-t border-border bg-surface-2 flex flex-col min-h-0">
+                <header className="shrink-0 px-5 pt-5 pb-3">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[.08em] text-text-2">Comentários</h3>
+                  <p className="mt-1 text-[10px] text-text-3">Feedbacks, referências e links entre a equipe.</p>
+                </header>
+                <div className="flex-1 min-h-0 overflow-y-auto scrollbar-clean px-5 pb-5">
+                  <CommentsThread
+                    cardId={editing.id}
+                    comments={comments}
+                    loaded={commentsLoaded}
+                    canDelete={!readOnly}
+                    currentTeamSlug={currentTeamSlug}
+                    onAdded={(c) => setComments((prev) => [...prev, c])}
+                    onDeleted={(id) => setComments((prev) => prev.filter((c) => c.id !== id))}
+                  />
+                </div>
+              </aside>
             )}
             </div>
 
